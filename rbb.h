@@ -20,10 +20,12 @@ uint32_t rbb_lt (int x, int y);
 uint32_t rbb_le (int x, int y);
 uint32_t rbb_sel(int x, int y, int z);
 
+uint32_t rbb_call(int ix);
+
 struct rbb {
-    int      in;
+    int      in, out;
     int      insts;
     uint32_t inst[64];
 };
 
-void eval(struct rbb const*, float reg[64]);
+void eval(struct rbb const*, float reg[64], struct rbb const *const call[64]);

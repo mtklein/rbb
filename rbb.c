@@ -5,6 +5,7 @@ enum {
     ABS=1, NEG, SQRT,
     ADD, SUB, MUL, DIV, FMA,
     EQ, NE, LT, LE, SEL,
+    CALL,
 };
 
 typedef union {
@@ -38,10 +39,12 @@ uint32_t rbb_ne (int x, int y       ) { return (inst){.op=NE , .x=x, .y=y,      
 uint32_t rbb_lt (int x, int y       ) { return (inst){.op=LT , .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_le (int x, int y       ) { return (inst){.op=LE , .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
+
+uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
 #pragma GCC diagnostic pop
 
 
-void eval(struct rbb const *rbb, float reg[64]) {
+void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]) {
     float const T = 1.0f,
                 F = 0.0f;
     for (int i = rbb->in; i < rbb->insts; i++) {
@@ -70,6 +73,21 @@ void eval(struct rbb const *rbb, float reg[64]) {
             case LE:  reg[i] = reg[inst.x] <= reg[inst.y] ? T : F; break;
             case SEL: reg[i] = reg[inst.x] == T ? reg[inst.y] : reg[inst.z]; break;
         #pragma GCC diagnostic pop
+
+            case CALL: {
+                struct rbb const *sub = call[inst.x];
+                int   const in  = sub->in;
+                int   const out = sub->insts - sub->out;
+                float subreg[64] = {0};
+                for (int j = 0; j < in; j++) {
+                    subreg[j] = reg[i - in + j];
+                }
+                eval(sub, subreg, call);
+                for (int j = 0; j < out; j++) {
+                    reg[i + j] = subreg[sub->out + j];
+                }
+                i += out - 1;
+            } break;
         }
     }
 }
