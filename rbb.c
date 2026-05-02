@@ -4,8 +4,8 @@
 enum {
     ABS=1, NEG, SQRT,
     ADD, SUB, MUL, DIV, FMA,
-    EQ, NE, LT, LE, SEL,
-    AND, OR, NOT,
+    EQ, NE, LT, LE,
+    AND, OR, NOT, SEL,
     CALL,
 };
 
@@ -35,15 +35,15 @@ uint32_t rbb_mul(int x, int y       ) { return (inst){.op=MUL, .x=x, .y=y,      
 uint32_t rbb_div(int x, int y       ) { return (inst){.op=DIV, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_fma(int x, int y, int z) { return (inst){.op=FMA, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
-uint32_t rbb_eq (int x, int y       ) { return (inst){.op=EQ , .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_ne (int x, int y       ) { return (inst){.op=NE , .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_lt (int x, int y       ) { return (inst){.op=LT , .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_le (int x, int y       ) { return (inst){.op=LE , .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
+uint32_t rbb_eq(int x, int y) { return (inst){.op=EQ , .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_ne(int x, int y) { return (inst){.op=NE , .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_lt(int x, int y) { return (inst){.op=LT , .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_le(int x, int y) { return (inst){.op=LE , .x=x, .y=y, .hi=-1}.bits; }
 
-uint32_t rbb_and(int x, int y) { return (inst){.op=AND, .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_or (int x, int y) { return (inst){.op=OR , .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_not(int x       ) { return (inst){.op=NOT, .x=x,       .hi=-1}.bits; }
+uint32_t rbb_not(int x              ) { return (inst){.op=NOT, .x=x,             .hi=-1}.bits; }
+uint32_t rbb_and(int x, int y       ) { return (inst){.op=AND, .x=x, .y=y,       .hi=-1}.bits; }
+uint32_t rbb_or (int x, int y       ) { return (inst){.op=OR , .x=x, .y=y,       .hi=-1}.bits; }
+uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
 uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
 
@@ -87,7 +87,8 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
             case SUB: reg[i] = reg[inst.x] - reg[inst.y]; break;
             case MUL: reg[i] = reg[inst.x] * reg[inst.y]; break;
             case DIV: reg[i] = reg[inst.x] / reg[inst.y]; break;
-            case FMA: reg[i] = __builtin_elementwise_fma(reg[inst.x], reg[inst.y], reg[inst.z]); break;
+            case FMA: reg[i] = __builtin_elementwise_fma(reg[inst.x], reg[inst.y], reg[inst.z]);
+                               break;
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
@@ -96,14 +97,15 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
             case LT:  reg[i] = vu2f(reg[inst.x] <  reg[inst.y]); break;
             case LE:  reg[i] = vu2f(reg[inst.x] <= reg[inst.y]); break;
         #pragma GCC diagnostic pop
-            case SEL: {
-                v8i m = vf2u(reg[inst.x]);
-                reg[i] = vu2f((m & vf2u(reg[inst.y])) | (~m & vf2u(reg[inst.z])));
-            } break;
 
-            case AND: reg[i] = vu2f(vf2u(reg[inst.x]) & vf2u(reg[inst.y])); break;
-            case OR : reg[i] = vu2f(vf2u(reg[inst.x]) | vf2u(reg[inst.y])); break;
+            case AND: reg[i] = vu2f( vf2u(reg[inst.x]) & vf2u(reg[inst.y])); break;
+            case OR : reg[i] = vu2f( vf2u(reg[inst.x]) | vf2u(reg[inst.y])); break;
             case NOT: reg[i] = vu2f(~vf2u(reg[inst.x])); break;
+            case SEL: {
+                v8i const mask = vf2u(reg[inst.x]);
+                reg[i] = vu2f( ( mask & vf2u(reg[inst.y]))
+                             | (~mask & vf2u(reg[inst.z])));
+            } break;
 
             case CALL: {
                 struct rbb const *sub = call[inst.x];
@@ -149,14 +151,14 @@ void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]
             case LT:  reg[i] = u2f(reg[inst.x] <  reg[inst.y] ? ~0u : 0u); break;
             case LE:  reg[i] = u2f(reg[inst.x] <= reg[inst.y] ? ~0u : 0u); break;
         #pragma GCC diagnostic pop
+
+            case AND: reg[i] = u2f( f2u(reg[inst.x]) & f2u(reg[inst.y])); break;
+            case OR : reg[i] = u2f( f2u(reg[inst.x]) | f2u(reg[inst.y])); break;
+            case NOT: reg[i] = u2f(~f2u(reg[inst.x])); break;
             case SEL: {
                 uint32_t m = f2u(reg[inst.x]);
                 reg[i] = u2f((m & f2u(reg[inst.y])) | (~m & f2u(reg[inst.z])));
             } break;
-
-            case AND: reg[i] = u2f(f2u(reg[inst.x]) & f2u(reg[inst.y])); break;
-            case OR : reg[i] = u2f(f2u(reg[inst.x]) | f2u(reg[inst.y])); break;
-            case NOT: reg[i] = u2f(~f2u(reg[inst.x])); break;
 
             case CALL: {
                 struct rbb const *sub = call[inst.x];
