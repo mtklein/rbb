@@ -104,6 +104,64 @@ static void test_div(void) {
     equiv(reg[3], 1.0f/3.0f) here;
 }
 
+static void test_min(void) {
+    struct rbb r = {.in=2, .out=2, .insts=4, .inst={
+        [2] = rbb_min(0,1),
+        [3] = rbb_min(1,0),
+    }};
+    float reg[64] = {3.0f, 7.0f};
+    eval(&r, reg, NULL);
+    equiv(reg[2], 3.0f) here;
+    equiv(reg[3], 3.0f) here;
+}
+
+static void test_max(void) {
+    struct rbb r = {.in=2, .out=2, .insts=4, .inst={
+        [2] = rbb_max(0,1),
+        [3] = rbb_max(1,0),
+    }};
+    float reg[64] = {3.0f, 7.0f};
+    eval(&r, reg, NULL);
+    equiv(reg[2], 7.0f) here;
+    equiv(reg[3], 7.0f) here;
+}
+
+static void test_round_family(void) {
+    struct rbb r = {.in=1, .out=4, .insts=5, .inst={
+        [1] = rbb_floor(0),
+        [2] = rbb_ceil (0),
+        [3] = rbb_trunc(0),
+        [4] = rbb_round(0),
+    }};
+    {
+        float reg[64] = {2.6f};
+        eval(&r, reg, NULL);
+        equiv(reg[1], 2.0f) here;
+        equiv(reg[2], 3.0f) here;
+        equiv(reg[3], 2.0f) here;
+        equiv(reg[4], 3.0f) here;
+    }
+    {
+        float reg[64] = {-2.6f};
+        eval(&r, reg, NULL);
+        equiv(reg[1], -3.0f) here;
+        equiv(reg[2], -2.0f) here;
+        equiv(reg[3], -2.0f) here;
+        equiv(reg[4], -3.0f) here;
+    }
+    {
+        // Halfway cases: round() ties away from zero.
+        float reg[64] = {1.5f};
+        eval(&r, reg, NULL);
+        equiv(reg[4], 2.0f) here;
+    }
+    {
+        float reg[64] = {-1.5f};
+        eval(&r, reg, NULL);
+        equiv(reg[4], -2.0f) here;
+    }
+}
+
 static void test_fma(void) {
     struct rbb r = {.in=3, .out=1, .insts=4, .inst={
         [3] = rbb_fma(0,1,2),
@@ -403,6 +461,37 @@ static void test_evalv_bitwise(void) {
     }
 }
 
+static void test_evalv_round_minmax(void) {
+    struct rbb r = {.in=2, .out=6, .insts=8, .inst={
+        [2] = rbb_min  (0,1),
+        [3] = rbb_max  (0,1),
+        [4] = rbb_floor(0),
+        [5] = rbb_ceil (0),
+        [6] = rbb_trunc(0),
+        [7] = rbb_round(0),
+    }};
+    v8f reg[64] = {
+        [0] = {-2.6f, -1.5f, -0.5f, 0.0f, 0.5f, 1.5f, 2.6f, 3.0f},
+        [1] = { 1.0f,  0.0f,  0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+    };
+    v8f expect_min   = {-2.6f, -1.5f, -0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    v8f expect_max   = { 1.0f,  0.0f,  0.0f, 0.0f, 0.5f, 1.5f, 2.6f, 3.0f};
+    v8f expect_floor = {-3.0f, -2.0f, -1.0f, 0.0f, 0.0f, 1.0f, 2.0f, 3.0f};
+    v8f expect_ceil  = {-2.0f, -1.0f,  0.0f, 0.0f, 1.0f, 2.0f, 3.0f, 3.0f};
+    v8f expect_trunc = {-2.0f, -1.0f,  0.0f, 0.0f, 0.0f, 1.0f, 2.0f, 3.0f};
+    v8f expect_round = {-3.0f, -2.0f, -1.0f, 0.0f, 1.0f, 2.0f, 3.0f, 3.0f};
+
+    evalv(&r, reg, NULL);
+    for (int j = 0; j < 8; j++) {
+        equiv(reg[2][j], expect_min  [j]) here;
+        equiv(reg[3][j], expect_max  [j]) here;
+        equiv(reg[4][j], expect_floor[j]) here;
+        equiv(reg[5][j], expect_ceil [j]) here;
+        equiv(reg[6][j], expect_trunc[j]) here;
+        equiv(reg[7][j], expect_round[j]) here;
+    }
+}
+
 static void test_evalv_fma(void) {
     struct rbb r = {.in=3, .out=1, .insts=4, .inst={
         [3] = rbb_fma(0,1,2),
@@ -446,6 +535,9 @@ int main(void) {
     test_sub();
     test_mul();
     test_div();
+    test_min();
+    test_max();
+    test_round_family();
     test_fma();
     test_eq();
     test_ne();
@@ -465,6 +557,7 @@ int main(void) {
     test_evalv_unary();
     test_evalv_cmp_and_sel();
     test_evalv_bitwise();
+    test_evalv_round_minmax();
     test_evalv_fma();
     test_evalv_call();
     return 0;

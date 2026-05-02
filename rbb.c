@@ -2,8 +2,8 @@
 #include <math.h>
 
 enum {
-    ABS=1, NEG, SQRT,
-    ADD, SUB, MUL, DIV, FMA,
+    ABS=1, NEG, SQRT, FLOOR, CEIL, TRUNC, ROUND,
+    ADD, SUB, MUL, DIV, MIN, MAX, FMA,
     EQ, NE, LT, LE,
     AND, OR, NOT, SEL,
     CALL,
@@ -25,14 +25,20 @@ uint32_t rbb_imm(float imm) { return (inst){.imm=imm}.bits; }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-conversion"
-uint32_t rbb_abs (int x) { return (inst){.op=ABS , .x=x, .hi=-1}.bits; }
-uint32_t rbb_neg (int x) { return (inst){.op=NEG , .x=x, .hi=-1}.bits; }
-uint32_t rbb_sqrt(int x) { return (inst){.op=SQRT, .x=x, .hi=-1}.bits; }
+uint32_t rbb_abs  (int x) { return (inst){.op=ABS  , .x=x, .hi=-1}.bits; }
+uint32_t rbb_neg  (int x) { return (inst){.op=NEG  , .x=x, .hi=-1}.bits; }
+uint32_t rbb_sqrt (int x) { return (inst){.op=SQRT , .x=x, .hi=-1}.bits; }
+uint32_t rbb_floor(int x) { return (inst){.op=FLOOR, .x=x, .hi=-1}.bits; }
+uint32_t rbb_ceil (int x) { return (inst){.op=CEIL , .x=x, .hi=-1}.bits; }
+uint32_t rbb_trunc(int x) { return (inst){.op=TRUNC, .x=x, .hi=-1}.bits; }
+uint32_t rbb_round(int x) { return (inst){.op=ROUND, .x=x, .hi=-1}.bits; }
 
 uint32_t rbb_add(int x, int y       ) { return (inst){.op=ADD, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_sub(int x, int y       ) { return (inst){.op=SUB, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_mul(int x, int y       ) { return (inst){.op=MUL, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_div(int x, int y       ) { return (inst){.op=DIV, .x=x, .y=y,       .hi=-1}.bits; }
+uint32_t rbb_min(int x, int y       ) { return (inst){.op=MIN, .x=x, .y=y,       .hi=-1}.bits; }
+uint32_t rbb_max(int x, int y       ) { return (inst){.op=MAX, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_fma(int x, int y, int z) { return (inst){.op=FMA, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
 uint32_t rbb_eq(int x, int y) { return (inst){.op=EQ , .x=x, .y=y, .hi=-1}.bits; }
@@ -79,14 +85,20 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
         } else switch (inst.op) {
             default: __builtin_unreachable();
 
-            case  ABS: reg[i] = __builtin_elementwise_abs (reg[inst.x]); break;
-            case  NEG: reg[i] =                          -(reg[inst.x]); break;
-            case SQRT: reg[i] = __builtin_elementwise_sqrt(reg[inst.x]); break;
+            case   ABS: reg[i] = __builtin_elementwise_abs  (reg[inst.x]); break;
+            case   NEG: reg[i] =                           -(reg[inst.x]); break;
+            case  SQRT: reg[i] = __builtin_elementwise_sqrt (reg[inst.x]); break;
+            case FLOOR: reg[i] = __builtin_elementwise_floor(reg[inst.x]); break;
+            case  CEIL: reg[i] = __builtin_elementwise_ceil (reg[inst.x]); break;
+            case TRUNC: reg[i] = __builtin_elementwise_trunc(reg[inst.x]); break;
+            case ROUND: reg[i] = __builtin_elementwise_round(reg[inst.x]); break;
 
             case ADD: reg[i] = reg[inst.x] + reg[inst.y]; break;
             case SUB: reg[i] = reg[inst.x] - reg[inst.y]; break;
             case MUL: reg[i] = reg[inst.x] * reg[inst.y]; break;
             case DIV: reg[i] = reg[inst.x] / reg[inst.y]; break;
+            case MIN: reg[i] = __builtin_elementwise_min(reg[inst.x], reg[inst.y]); break;
+            case MAX: reg[i] = __builtin_elementwise_max(reg[inst.x], reg[inst.y]); break;
             case FMA: reg[i] = __builtin_elementwise_fma(reg[inst.x], reg[inst.y], reg[inst.z]);
                                break;
 
@@ -134,14 +146,20 @@ void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]
         } else switch (inst.op) {
             default: __builtin_unreachable();
 
-            case  ABS: reg[i] = fabsf(reg[inst.x]); break;
-            case  NEG: reg[i] =     -(reg[inst.x]); break;
-            case SQRT: reg[i] = sqrtf(reg[inst.x]); break;
+            case   ABS: reg[i] =  fabsf(reg[inst.x]); break;
+            case   NEG: reg[i] =      -(reg[inst.x]); break;
+            case  SQRT: reg[i] =  sqrtf(reg[inst.x]); break;
+            case FLOOR: reg[i] = floorf(reg[inst.x]); break;
+            case  CEIL: reg[i] =  ceilf(reg[inst.x]); break;
+            case TRUNC: reg[i] = truncf(reg[inst.x]); break;
+            case ROUND: reg[i] = roundf(reg[inst.x]); break;
 
             case ADD: reg[i] = reg[inst.x] + reg[inst.y]; break;
             case SUB: reg[i] = reg[inst.x] - reg[inst.y]; break;
             case MUL: reg[i] = reg[inst.x] * reg[inst.y]; break;
             case DIV: reg[i] = reg[inst.x] / reg[inst.y]; break;
+            case MIN: reg[i] = fminf(reg[inst.x], reg[inst.y]); break;
+            case MAX: reg[i] = fmaxf(reg[inst.x], reg[inst.y]); break;
             case FMA: reg[i] = fmaf(reg[inst.x], reg[inst.y], reg[inst.z]); break;
 
         #pragma GCC diagnostic push

@@ -4,14 +4,20 @@
 
 uint32_t rbb_imm(float);
 
-uint32_t rbb_abs (int x);
-uint32_t rbb_neg (int x);
-uint32_t rbb_sqrt(int x);
+uint32_t rbb_abs  (int x);
+uint32_t rbb_neg  (int x);
+uint32_t rbb_sqrt (int x);
+uint32_t rbb_floor(int x);
+uint32_t rbb_ceil (int x);
+uint32_t rbb_trunc(int x);
+uint32_t rbb_round(int x);
 
 uint32_t rbb_add(int x, int y);
 uint32_t rbb_sub(int x, int y);
 uint32_t rbb_mul(int x, int y);
 uint32_t rbb_div(int x, int y);
+uint32_t rbb_min(int x, int y);
+uint32_t rbb_max(int x, int y);
 uint32_t rbb_fma(int x, int y, int z);
 
 uint32_t rbb_eq (int x, int y);
