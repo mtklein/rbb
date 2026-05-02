@@ -5,6 +5,7 @@ enum {
     ABS=1, NEG, SQRT,
     ADD, SUB, MUL, DIV, FMA,
     EQ, NE, LT, LE, SEL,
+    AND, OR, NOT,
     CALL,
 };
 
@@ -40,6 +41,10 @@ uint32_t rbb_lt (int x, int y       ) { return (inst){.op=LT , .x=x, .y=y,      
 uint32_t rbb_le (int x, int y       ) { return (inst){.op=LE , .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
+uint32_t rbb_and(int x, int y) { return (inst){.op=AND, .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_or (int x, int y) { return (inst){.op=OR , .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_not(int x       ) { return (inst){.op=NOT, .x=x,       .hi=-1}.bits; }
+
 uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
 
 int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
@@ -60,8 +65,12 @@ int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
+static uint32_t f2u(float    x) { return __builtin_bit_cast(uint32_t, x); }
+static float    u2f(uint32_t x) { return __builtin_bit_cast(float, x); }
+static v8i      vf2u(v8f x) { return __builtin_bit_cast(v8i, x); }
+static v8f      vu2f(v8i x) { return __builtin_bit_cast(v8f, x); }
+
 void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64]) {
-    v8f const T = 1.0f;
     for (int i = rbb->in; i < rbb->insts; i++) {
         inst const inst = {.bits=rbb->inst[i]};
 
@@ -82,17 +91,19 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
-            case EQ:  reg[i] = -__builtin_convertvector(reg[inst.x] == reg[inst.y], v8f); break;
-            case NE:  reg[i] = -__builtin_convertvector(reg[inst.x] != reg[inst.y], v8f); break;
-            case LT:  reg[i] = -__builtin_convertvector(reg[inst.x] <  reg[inst.y], v8f); break;
-            case LE:  reg[i] = -__builtin_convertvector(reg[inst.x] <= reg[inst.y], v8f); break;
-            case SEL: {
-                v8i m  = reg[inst.x] == T;
-                v8i yi = __builtin_bit_cast(v8i, reg[inst.y]);
-                v8i zi = __builtin_bit_cast(v8i, reg[inst.z]);
-                reg[i] = __builtin_bit_cast(v8f, (m & yi) | (~m & zi));
-            } break;
+            case EQ:  reg[i] = vu2f(reg[inst.x] == reg[inst.y]); break;
+            case NE:  reg[i] = vu2f(reg[inst.x] != reg[inst.y]); break;
+            case LT:  reg[i] = vu2f(reg[inst.x] <  reg[inst.y]); break;
+            case LE:  reg[i] = vu2f(reg[inst.x] <= reg[inst.y]); break;
         #pragma GCC diagnostic pop
+            case SEL: {
+                v8i m = vf2u(reg[inst.x]);
+                reg[i] = vu2f((m & vf2u(reg[inst.y])) | (~m & vf2u(reg[inst.z])));
+            } break;
+
+            case AND: reg[i] = vu2f(vf2u(reg[inst.x]) & vf2u(reg[inst.y])); break;
+            case OR : reg[i] = vu2f(vf2u(reg[inst.x]) | vf2u(reg[inst.y])); break;
+            case NOT: reg[i] = vu2f(~vf2u(reg[inst.x])); break;
 
             case CALL: {
                 struct rbb const *sub = call[inst.x];
@@ -113,8 +124,6 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
 }
 
 void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]) {
-    float const T = 1.0f,
-                F = 0.0f;
     for (int i = rbb->in; i < rbb->insts; i++) {
         inst const inst = {.bits=rbb->inst[i]};
 
@@ -135,12 +144,19 @@ void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
-            case EQ:  reg[i] = reg[inst.x] == reg[inst.y] ? T : F; break;
-            case NE:  reg[i] = reg[inst.x] != reg[inst.y] ? T : F; break;
-            case LT:  reg[i] = reg[inst.x] <  reg[inst.y] ? T : F; break;
-            case LE:  reg[i] = reg[inst.x] <= reg[inst.y] ? T : F; break;
-            case SEL: reg[i] = reg[inst.x] == T ? reg[inst.y] : reg[inst.z]; break;
+            case EQ:  reg[i] = u2f(reg[inst.x] == reg[inst.y] ? ~0u : 0u); break;
+            case NE:  reg[i] = u2f(reg[inst.x] != reg[inst.y] ? ~0u : 0u); break;
+            case LT:  reg[i] = u2f(reg[inst.x] <  reg[inst.y] ? ~0u : 0u); break;
+            case LE:  reg[i] = u2f(reg[inst.x] <= reg[inst.y] ? ~0u : 0u); break;
         #pragma GCC diagnostic pop
+            case SEL: {
+                uint32_t m = f2u(reg[inst.x]);
+                reg[i] = u2f((m & f2u(reg[inst.y])) | (~m & f2u(reg[inst.z])));
+            } break;
+
+            case AND: reg[i] = u2f(f2u(reg[inst.x]) & f2u(reg[inst.y])); break;
+            case OR : reg[i] = u2f(f2u(reg[inst.x]) | f2u(reg[inst.y])); break;
+            case NOT: reg[i] = u2f(~f2u(reg[inst.x])); break;
 
             case CALL: {
                 struct rbb const *sub = call[inst.x];

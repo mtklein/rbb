@@ -1,4 +1,5 @@
 #include "rbb.h"
+#include <stdint.h>
 #include <stdio.h>
 
 #define here || (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap(), 0)
@@ -6,6 +7,10 @@
 static _Bool equiv(float x, float y) {
     return (x <= y && y <= x)
         || (x != x && y != y);
+}
+
+static _Bool bits_eq(float x, uint32_t b) {
+    return __builtin_bit_cast(uint32_t, x) == b;
 }
 
 static void test_imm(void) {
@@ -115,8 +120,8 @@ static void test_eq(void) {
     }};
     float reg[64] = {3.0f, 3.0f, 4.0f};
     eval(&r, reg, NULL);
-    equiv(reg[3], 1.0f) here;
-    equiv(reg[4], 0.0f) here;
+    bits_eq(reg[3], ~0u) here;
+    bits_eq(reg[4],  0u) here;
 }
 
 static void test_ne(void) {
@@ -126,8 +131,8 @@ static void test_ne(void) {
     }};
     float reg[64] = {3.0f, 3.0f, 4.0f};
     eval(&r, reg, NULL);
-    equiv(reg[3], 0.0f) here;
-    equiv(reg[4], 1.0f) here;
+    bits_eq(reg[3],  0u) here;
+    bits_eq(reg[4], ~0u) here;
 }
 
 static void test_lt(void) {
@@ -138,9 +143,9 @@ static void test_lt(void) {
     }};
     float reg[64] = {1.0f, 2.0f, 1.0f};
     eval(&r, reg, NULL);
-    equiv(reg[3], 1.0f) here;
-    equiv(reg[4], 0.0f) here;
-    equiv(reg[5], 0.0f) here;
+    bits_eq(reg[3], ~0u) here;
+    bits_eq(reg[4],  0u) here;
+    bits_eq(reg[5],  0u) here;
 }
 
 static void test_le(void) {
@@ -151,21 +156,48 @@ static void test_le(void) {
     }};
     float reg[64] = {1.0f, 2.0f, 1.0f};
     eval(&r, reg, NULL);
-    equiv(reg[3], 1.0f) here;
-    equiv(reg[4], 0.0f) here;
-    equiv(reg[5], 1.0f) here;
+    bits_eq(reg[3], ~0u) here;
+    bits_eq(reg[4],  0u) here;
+    bits_eq(reg[5], ~0u) here;
 }
 
 static void test_sel(void) {
-    struct rbb r = {.in=3, .out=2, .insts=6, .inst={
-        [3] = rbb_imm(1.0f),
-        [4] = rbb_sel(3,0,1),
-        [5] = rbb_sel(2,0,1),
+    struct rbb r = {.in=3, .out=2, .insts=5, .inst={
+        [3] = rbb_eq(0,0),       // ~0 mask
+        [4] = rbb_sel(3, 0, 1),  // mask=~0 -> picks reg[0]
     }};
     float reg[64] = {100.0f, 200.0f, 0.0f};
     eval(&r, reg, NULL);
     equiv(reg[4], 100.0f) here;
-    equiv(reg[5], 200.0f) here;
+}
+
+static void test_bitwise(void) {
+    struct rbb r = {.in=2, .out=4, .insts=6, .inst={
+        [2] = rbb_eq (0,0),    // mask = ~0
+        [3] = rbb_and(2,1),    // ~0 & v = v
+        [4] = rbb_or (0,1),    //  0 | v = v
+        [5] = rbb_not(0),      // ~0 = ~0
+    }};
+    float reg[64] = {0.0f, 0.5f};
+    eval(&r, reg, NULL);
+    bits_eq(reg[2], ~0u)  here;
+    equiv  (reg[3], 0.5f) here;
+    equiv  (reg[4], 0.5f) here;
+    bits_eq(reg[5], ~0u)  here;
+}
+
+static void test_sel_blend(void) {
+    // Use SEL as a real per-bit blend: pick lanes from y where mask is ~0, z where 0.
+    // With scalar floats there are no lanes, but we still verify the pure-mask paths.
+    struct rbb r = {.in=2, .out=2, .insts=5, .inst={
+        [2] = rbb_eq (0,0),       // ~0 mask  -> picks y
+        [3] = rbb_sel(2, 0, 1),
+        [4] = rbb_sel(1, 0, 1),   //  0 mask (reg[1] bits = 0) -> picks z
+    }};
+    float reg[64] = {7.0f, 0.0f};  // reg[1] = 0.0f has all-zero bits
+    eval(&r, reg, NULL);
+    equiv(reg[3], 7.0f) here;
+    equiv(reg[4], 0.0f) here;
 }
 
 static void test_chain(void) {
@@ -343,11 +375,31 @@ static void test_evalv_cmp_and_sel(void) {
     evalv(&r, reg, NULL);
     for (int j = 0; j < 8; j++) {
         float x = reg[0][j], y = reg[1][j];
-        equiv(reg[2][j],  x < y         ? 1.0f : 0.0f) here;
-        equiv(reg[3][j], (x < y || equiv(x, y)) ? 1.0f : 0.0f) here;
-        equiv(reg[4][j], equiv(x, y)    ? 1.0f : 0.0f) here;
-        equiv(reg[5][j], equiv(x, y)    ? 0.0f : 1.0f) here;
-        equiv(reg[6][j],  x < y         ? x    : y   ) here;
+        bits_eq(reg[2][j],  x < y                ? ~0u : 0u) here;
+        bits_eq(reg[3][j], (x < y || equiv(x,y)) ? ~0u : 0u) here;
+        bits_eq(reg[4][j], equiv(x, y)           ? ~0u : 0u) here;
+        bits_eq(reg[5][j], equiv(x, y)           ? 0u : ~0u) here;
+        equiv  (reg[6][j],  x < y                ? x   : y ) here;
+    }
+}
+
+static void test_evalv_bitwise(void) {
+    struct rbb r = {.in=2, .out=4, .insts=6, .inst={
+        [2] = rbb_eq (0,0),
+        [3] = rbb_and(2,1),
+        [4] = rbb_or (0,1),
+        [5] = rbb_not(0),
+    }};
+    v8f reg[64] = {
+        [0] = {0,0,0,0,0,0,0,0},
+        [1] = {0.5f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f},
+    };
+    evalv(&r, reg, NULL);
+    for (int j = 0; j < 8; j++) {
+        bits_eq(reg[2][j], ~0u)        here;
+        equiv  (reg[3][j], reg[1][j])  here;
+        equiv  (reg[4][j], reg[1][j])  here;
+        bits_eq(reg[5][j], ~0u)        here;
     }
 }
 
@@ -400,6 +452,8 @@ int main(void) {
     test_lt();
     test_le();
     test_sel();
+    test_bitwise();
+    test_sel_blend();
     test_chain();
     test_max_capacity();
     test_call();
@@ -410,6 +464,7 @@ int main(void) {
     test_evalv_chain();
     test_evalv_unary();
     test_evalv_cmp_and_sel();
+    test_evalv_bitwise();
     test_evalv_fma();
     test_evalv_call();
     return 0;

@@ -20,6 +20,10 @@ uint32_t rbb_lt (int x, int y);
 uint32_t rbb_le (int x, int y);
 uint32_t rbb_sel(int x, int y, int z);
 
+uint32_t rbb_and(int x, int y);
+uint32_t rbb_or (int x, int y);
+uint32_t rbb_not(int x);
+
 uint32_t rbb_call(int ix);
 
 struct rbb {
