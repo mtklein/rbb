@@ -2,7 +2,7 @@
 #include <math.h>
 
 enum {
-    ABS, NEG, SQRT,
+    ABS=1, NEG, SQRT,
     ADD, SUB, MUL, DIV, FMA,
     EQ, NE, LT, LE, SEL,
 };
