@@ -58,6 +58,60 @@ int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
 #pragma GCC diagnostic pop
 
 
+typedef int v8i __attribute__((ext_vector_type(8)));
+
+void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64]) {
+    v8f const T = 1.0f;
+    for (int i = rbb->in; i < rbb->insts; i++) {
+        inst const inst = {.bits=rbb->inst[i]};
+
+        if (inst.imm <= inst.imm) {
+            reg[i] = inst.imm;
+        } else switch (inst.op) {
+            default: __builtin_unreachable();
+
+            case  ABS: reg[i] = __builtin_elementwise_abs (reg[inst.x]); break;
+            case  NEG: reg[i] =                          -(reg[inst.x]); break;
+            case SQRT: reg[i] = __builtin_elementwise_sqrt(reg[inst.x]); break;
+
+            case ADD: reg[i] = reg[inst.x] + reg[inst.y]; break;
+            case SUB: reg[i] = reg[inst.x] - reg[inst.y]; break;
+            case MUL: reg[i] = reg[inst.x] * reg[inst.y]; break;
+            case DIV: reg[i] = reg[inst.x] / reg[inst.y]; break;
+            case FMA: reg[i] = __builtin_elementwise_fma(reg[inst.x], reg[inst.y], reg[inst.z]); break;
+
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wfloat-equal"
+            case EQ:  reg[i] = -__builtin_convertvector(reg[inst.x] == reg[inst.y], v8f); break;
+            case NE:  reg[i] = -__builtin_convertvector(reg[inst.x] != reg[inst.y], v8f); break;
+            case LT:  reg[i] = -__builtin_convertvector(reg[inst.x] <  reg[inst.y], v8f); break;
+            case LE:  reg[i] = -__builtin_convertvector(reg[inst.x] <= reg[inst.y], v8f); break;
+            case SEL: {
+                v8i m  = reg[inst.x] == T;
+                v8i yi = __builtin_bit_cast(v8i, reg[inst.y]);
+                v8i zi = __builtin_bit_cast(v8i, reg[inst.z]);
+                reg[i] = __builtin_bit_cast(v8f, (m & yi) | (~m & zi));
+            } break;
+        #pragma GCC diagnostic pop
+
+            case CALL: {
+                struct rbb const *sub = call[inst.x];
+                int const in  = sub->in;
+                int const out = sub->out;
+                v8f subreg[64] = {0};
+                for (int j = 0; j < in; j++) {
+                    subreg[j] = reg[i - in + j];
+                }
+                evalv(sub, subreg, call);
+                for (int j = 0; j < out; j++) {
+                    reg[i + j] = subreg[sub->insts - out + j];
+                }
+                i += out - 1;
+            } break;
+        }
+    }
+}
+
 void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]) {
     float const T = 1.0f,
                 F = 0.0f;

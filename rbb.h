@@ -30,3 +30,6 @@ struct rbb {
 
 int  rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]);
 void eval      (struct rbb const*, float reg[64], struct rbb const *const call[64]);
+
+typedef float v8f __attribute__((ext_vector_type(8)));
+void evalv(struct rbb const*, v8f reg[64], struct rbb const *const call[64]);

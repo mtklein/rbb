@@ -287,6 +287,104 @@ static void test_inline_remap(void) {
     equiv(reg[r], 24.0f) here;
 }
 
+static void test_evalv_chain(void) {
+    struct rbb foo = {.in=2, .out=1, .insts=7, .inst={
+        [2] = rbb_add(0,1),
+        [3] = rbb_sub(0,1),
+        [4] = rbb_mul(2,3),
+        [5] = rbb_imm(-89),
+        [6] = rbb_div(4,5),
+    }};
+    v8f reg[64] = {
+        [0] = {42, 1, 2, 3, 4, 5, 6, 7},
+        [1] = {47, 1, 2, 3, 4, 5, 6, 7},
+    };
+    evalv(&foo, reg, NULL);
+
+    for (int j = 0; j < 8; j++) {
+        float x = reg[0][j], y = reg[1][j];
+        equiv(reg[2][j], x + y) here;
+        equiv(reg[3][j], x - y) here;
+        equiv(reg[4][j], (x + y) * (x - y)) here;
+        equiv(reg[5][j], -89.0f) here;
+        equiv(reg[6][j], (x + y) * (x - y) / -89.0f) here;
+    }
+}
+
+static void test_evalv_unary(void) {
+    struct rbb r = {.in=1, .out=3, .insts=4, .inst={
+        [1] = rbb_abs (0),
+        [2] = rbb_neg (0),
+        [3] = rbb_sqrt(0),
+    }};
+    v8f reg[64] = {
+        [0] = {0.0f, 1.0f, 4.0f, 9.0f, 16.0f, 25.0f, 0.25f, 100.0f},
+    };
+    evalv(&r, reg, NULL);
+    for (int j = 0; j < 8; j++) {
+        equiv(reg[1][j], reg[0][j]) here;
+        equiv(reg[2][j], -reg[0][j]) here;
+        equiv(reg[3][j]*reg[3][j], reg[0][j]) here;
+    }
+}
+
+static void test_evalv_cmp_and_sel(void) {
+    struct rbb r = {.in=2, .out=5, .insts=7, .inst={
+        [2] = rbb_lt (0,1),
+        [3] = rbb_le (0,1),
+        [4] = rbb_eq (0,1),
+        [5] = rbb_ne (0,1),
+        [6] = rbb_sel(2,0,1),
+    }};
+    v8f reg[64] = {
+        [0] = {1, 2, 3, 4, 5, 6, 7, 8},
+        [1] = {2, 2, 2, 2, 5, 5, 5, 5},
+    };
+    evalv(&r, reg, NULL);
+    for (int j = 0; j < 8; j++) {
+        float x = reg[0][j], y = reg[1][j];
+        equiv(reg[2][j],  x < y         ? 1.0f : 0.0f) here;
+        equiv(reg[3][j], (x < y || equiv(x, y)) ? 1.0f : 0.0f) here;
+        equiv(reg[4][j], equiv(x, y)    ? 1.0f : 0.0f) here;
+        equiv(reg[5][j], equiv(x, y)    ? 0.0f : 1.0f) here;
+        equiv(reg[6][j],  x < y         ? x    : y   ) here;
+    }
+}
+
+static void test_evalv_fma(void) {
+    struct rbb r = {.in=3, .out=1, .insts=4, .inst={
+        [3] = rbb_fma(0,1,2),
+    }};
+    v8f reg[64] = {
+        [0] = {1, 2, 3, 4, 5, 6, 7, 8},
+        [1] = {2, 2, 2, 2, 3, 3, 3, 3},
+        [2] = {0, 1, 2, 3, 4, 5, 6, 7},
+    };
+    evalv(&r, reg, NULL);
+    for (int j = 0; j < 8; j++) {
+        equiv(reg[3][j], reg[0][j]*reg[1][j] + reg[2][j]) here;
+    }
+}
+
+static void test_evalv_call(void) {
+    struct rbb dbl = {.in=1, .out=1, .insts=2, .inst={
+        [1] = rbb_add(0,0),
+    }};
+    struct rbb caller = {.in=1, .out=1, .insts=3, .inst={
+        [1] = rbb_call(0),
+        [2] = rbb_call(0),
+    }};
+    struct rbb const *const calls[64] = { &dbl };
+
+    v8f reg[64] = {[0] = {1, 2, 3, 4, 5, 6, 7, 8}};
+    evalv(&caller, reg, calls);
+
+    for (int j = 0; j < 8; j++) {
+        equiv(reg[1][j], reg[0][j] *  2.0f) here;
+        equiv(reg[2][j], reg[0][j] *  4.0f) here;
+    }
+}
+
 int main(void) {
     test_imm();
     test_abs();
@@ -309,5 +407,10 @@ int main(void) {
     test_inline();
     test_inline_multi_io();
     test_inline_remap();
+    test_evalv_chain();
+    test_evalv_unary();
+    test_evalv_cmp_and_sel();
+    test_evalv_fma();
+    test_evalv_call();
     return 0;
 }
