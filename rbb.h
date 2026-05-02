@@ -28,4 +28,5 @@ struct rbb {
     uint32_t inst[64];
 };
 
-void eval(struct rbb const*, float reg[64], struct rbb const *const call[64]);
+int  rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]);
+void eval      (struct rbb const*, float reg[64], struct rbb const *const call[64]);

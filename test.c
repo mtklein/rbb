@@ -240,6 +240,53 @@ static void test_call_multi_io(void) {
     equiv(reg[4], 11.0f) here;
 }
 
+static void test_inline(void) {
+    struct rbb dbl = {.in=1, .out=1, .insts=2, .inst={
+        [1] = rbb_add(0,0),
+    }};
+    struct rbb caller = {.in=1, .insts=1};
+    float      reg[64] = {3.0f};
+    int        r1 = rbb_inline(&caller, &dbl, (int[]){0});
+    int        r2 = rbb_inline(&caller, &dbl, (int[]){r1});
+    caller.out = 1;
+    eval(&caller, reg, NULL);
+
+    equiv(reg[r1],  6.0f) here;
+    equiv(reg[r2], 12.0f) here;
+}
+
+static void test_inline_multi_io(void) {
+    struct rbb sumprod = {.in=2, .out=2, .insts=4, .inst={
+        [2] = rbb_add(0,1),
+        [3] = rbb_mul(0,1),
+    }};
+    struct rbb caller = {.in=2, .insts=2};
+    float      reg[64] = {2.0f, 3.0f};
+    int        sum  = rbb_inline(&caller, &sumprod, (int[]){0, 1});
+    int        prod = sum + 1;
+    caller.inst[caller.insts++] = rbb_add(sum, prod);
+    caller.out = 1;
+    eval(&caller, reg, NULL);
+
+    equiv(reg[sum],   5.0f) here;
+    equiv(reg[prod],  6.0f) here;
+    equiv(reg[caller.insts - 1], 11.0f) here;
+}
+
+static void test_inline_remap(void) {
+    struct rbb shape = {.in=2, .out=1, .insts=4, .inst={
+        [2] = rbb_mul(0,1),
+        [3] = rbb_add(2,0),
+    }};
+    struct rbb caller = {.in=3, .insts=3};
+    float      reg[64] = {99.0f, 4.0f, 5.0f};
+    int        r = rbb_inline(&caller, &shape, (int[]){1, 2});
+    caller.out = 1;
+    eval(&caller, reg, NULL);
+
+    equiv(reg[r], 24.0f) here;
+}
+
 int main(void) {
     test_imm();
     test_abs();
@@ -259,5 +306,8 @@ int main(void) {
     test_max_capacity();
     test_call();
     test_call_multi_io();
+    test_inline();
+    test_inline_multi_io();
+    test_inline_remap();
     return 0;
 }

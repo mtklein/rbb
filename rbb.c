@@ -41,6 +41,20 @@ uint32_t rbb_le (int x, int y       ) { return (inst){.op=LE , .x=x, .y=y,      
 uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
 uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
+
+int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
+    int const offset = dst->insts - src->in;
+    for (int k = src->in; k < src->insts; k++) {
+        inst si = {.bits = src->inst[k]};
+        if (!(si.imm <= si.imm) && si.op != CALL) {
+            si.x = si.x < (uint32_t)src->in ? (uint32_t)args[si.x] : si.x + (uint32_t)offset;
+            si.y = si.y < (uint32_t)src->in ? (uint32_t)args[si.y] : si.y + (uint32_t)offset;
+            si.z = si.z < (uint32_t)src->in ? (uint32_t)args[si.z] : si.z + (uint32_t)offset;
+        }
+        dst->inst[dst->insts++] = si.bits;
+    }
+    return dst->insts - src->out;
+}
 #pragma GCC diagnostic pop
 
 
