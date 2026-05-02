@@ -77,14 +77,14 @@ void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]
             case CALL: {
                 struct rbb const *sub = call[inst.x];
                 int   const in  = sub->in;
-                int   const out = sub->insts - sub->out;
+                int   const out = sub->out;
                 float subreg[64] = {0};
                 for (int j = 0; j < in; j++) {
                     subreg[j] = reg[i - in + j];
                 }
                 eval(sub, subreg, call);
                 for (int j = 0; j < out; j++) {
-                    reg[i + j] = subreg[sub->out + j];
+                    reg[i + j] = subreg[sub->insts - out + j];
                 }
                 i += out - 1;
             } break;

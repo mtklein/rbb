@@ -9,7 +9,7 @@ static _Bool equiv(float x, float y) {
 }
 
 static void test_imm(void) {
-    struct rbb r = {.in=0, .out=0, .insts=4, .inst={
+    struct rbb r = {.in=0, .out=4, .insts=4, .inst={
         [0] = rbb_imm(    3.5f),
         [1] = rbb_imm(   -0.25f),
         [2] = rbb_imm(    0.0f),
@@ -60,7 +60,7 @@ static void test_sqrt(void) {
 }
 
 static void test_add(void) {
-    struct rbb r = {.in=2, .out=2, .insts=3, .inst={
+    struct rbb r = {.in=2, .out=1, .insts=3, .inst={
         [2] = rbb_add(0,1),
     }};
     float reg[64] = {3.0f, -8.0f};
@@ -80,7 +80,7 @@ static void test_sub(void) {
 }
 
 static void test_mul(void) {
-    struct rbb r = {.in=2, .out=2, .insts=3, .inst={
+    struct rbb r = {.in=2, .out=1, .insts=3, .inst={
         [2] = rbb_mul(0,1),
     }};
     float reg[64] = {6.0f, -7.0f};
@@ -100,7 +100,7 @@ static void test_div(void) {
 }
 
 static void test_fma(void) {
-    struct rbb r = {.in=3, .out=3, .insts=4, .inst={
+    struct rbb r = {.in=3, .out=1, .insts=4, .inst={
         [3] = rbb_fma(0,1,2),
     }};
     float reg[64] = {2.0f, 3.0f, 5.0f};
@@ -109,7 +109,7 @@ static void test_fma(void) {
 }
 
 static void test_eq(void) {
-    struct rbb r = {.in=3, .out=3, .insts=5, .inst={
+    struct rbb r = {.in=3, .out=2, .insts=5, .inst={
         [3] = rbb_eq(0,1),
         [4] = rbb_eq(0,2),
     }};
@@ -120,7 +120,7 @@ static void test_eq(void) {
 }
 
 static void test_ne(void) {
-    struct rbb r = {.in=3, .out=3, .insts=5, .inst={
+    struct rbb r = {.in=3, .out=2, .insts=5, .inst={
         [3] = rbb_ne(0,1),
         [4] = rbb_ne(0,2),
     }};
@@ -157,7 +157,7 @@ static void test_le(void) {
 }
 
 static void test_sel(void) {
-    struct rbb r = {.in=3, .out=4, .insts=6, .inst={
+    struct rbb r = {.in=3, .out=2, .insts=6, .inst={
         [3] = rbb_imm(1.0f),
         [4] = rbb_sel(3,0,1),
         [5] = rbb_sel(2,0,1),
@@ -169,7 +169,7 @@ static void test_sel(void) {
 }
 
 static void test_chain(void) {
-    struct rbb foo = {.in=2, .out=6, .insts=7, .inst={
+    struct rbb foo = {.in=2, .out=1, .insts=7, .inst={
         [2] = rbb_add(0,1),
         [3] = rbb_sub(0,1),
         [4] = rbb_mul(2,3),
@@ -189,7 +189,7 @@ static void test_chain(void) {
 }
 
 static void test_max_capacity(void) {
-    struct rbb r = {.in=1, .out=63, .insts=64};
+    struct rbb r = {.in=1, .out=1, .insts=64};
     float reg[64] = {0.0f};
 
     r.inst[1] = rbb_imm(1.0f);
@@ -208,7 +208,7 @@ static void test_call(void) {
     struct rbb dbl = {.in=1, .out=1, .insts=2, .inst={
         [1] = rbb_add(0,0),
     }};
-    struct rbb caller = {.in=1, .out=2, .insts=3, .inst={
+    struct rbb caller = {.in=1, .out=1, .insts=3, .inst={
         [1] = rbb_call(0),
         [2] = rbb_call(0),
     }};
@@ -226,7 +226,7 @@ static void test_call_multi_io(void) {
         [2] = rbb_add(0,1),
         [3] = rbb_mul(0,1),
     }};
-    struct rbb caller = {.in=2, .out=4, .insts=5, .inst={
+    struct rbb caller = {.in=2, .out=1, .insts=5, .inst={
         [2] = rbb_call(0),
         [4] = rbb_add(2,3),
     }};
