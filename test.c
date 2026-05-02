@@ -9,7 +9,7 @@ static _Bool equiv(float x, float y) {
 }
 
 static void test_imm(void) {
-    struct rbb r = {0,3,4, {
+    struct rbb r = {0,4, {
         [0] = rbb_imm(    3.5f),
         [1] = rbb_imm(   -0.25f),
         [2] = rbb_imm(    0.0f),
@@ -24,7 +24,7 @@ static void test_imm(void) {
 }
 
 static void test_abs(void) {
-    struct rbb r = {1,3,4, {
+    struct rbb r = {1,4, {
         [1] = rbb_imm(-2.5f),
         [2] = rbb_abs(0),
         [3] = rbb_abs(1),
@@ -36,7 +36,7 @@ static void test_abs(void) {
 }
 
 static void test_neg(void) {
-    struct rbb r = {1,3,4, {
+    struct rbb r = {1,4, {
         [1] = rbb_imm(2.0f),
         [2] = rbb_neg(0),
         [3] = rbb_neg(1),
@@ -48,7 +48,7 @@ static void test_neg(void) {
 }
 
 static void test_sqrt(void) {
-    struct rbb r = {1,3,4, {
+    struct rbb r = {1,4, {
         [1] = rbb_imm(2.25f),
         [2] = rbb_sqrt(0),
         [3] = rbb_sqrt(1),
@@ -60,14 +60,14 @@ static void test_sqrt(void) {
 }
 
 static void test_add(void) {
-    struct rbb r = {2,2,3, {[2] = rbb_add(0,1)}};
+    struct rbb r = {2,3, {[2] = rbb_add(0,1)}};
     float reg[3] = {3.0f, -8.0f};
     eval(&r, reg);
     equiv(reg[2], -5.0f) here;
 }
 
 static void test_sub(void) {
-    struct rbb r = {2,3,4, {
+    struct rbb r = {2,4, {
         [2] = rbb_sub(0,1),
         [3] = rbb_sub(1,0),
     }};
@@ -78,14 +78,14 @@ static void test_sub(void) {
 }
 
 static void test_mul(void) {
-    struct rbb r = {2,2,3, {[2] = rbb_mul(0,1)}};
+    struct rbb r = {2,3, {[2] = rbb_mul(0,1)}};
     float reg[3] = {6.0f, -7.0f};
     eval(&r, reg);
     equiv(reg[2], -42.0f) here;
 }
 
 static void test_div(void) {
-    struct rbb r = {2,3,4, {
+    struct rbb r = {2,4, {
         [2] = rbb_div(0,1),
         [3] = rbb_div(1,0),
     }};
@@ -96,14 +96,14 @@ static void test_div(void) {
 }
 
 static void test_fma(void) {
-    struct rbb r = {3,3,4, {[3] = rbb_fma(0,1,2)}};
+    struct rbb r = {3,4, {[3] = rbb_fma(0,1,2)}};
     float reg[4] = {2.0f, 3.0f, 5.0f};
     eval(&r, reg);
     equiv(reg[3], 11.0f) here;
 }
 
 static void test_eq(void) {
-    struct rbb r = {3,4,5, {
+    struct rbb r = {3,5, {
         [3] = rbb_eq(0,1),
         [4] = rbb_eq(0,2),
     }};
@@ -114,7 +114,7 @@ static void test_eq(void) {
 }
 
 static void test_ne(void) {
-    struct rbb r = {3,4,5, {
+    struct rbb r = {3,5, {
         [3] = rbb_ne(0,1),
         [4] = rbb_ne(0,2),
     }};
@@ -125,7 +125,7 @@ static void test_ne(void) {
 }
 
 static void test_lt(void) {
-    struct rbb r = {3,5,6, {
+    struct rbb r = {3,6, {
         [3] = rbb_lt(0,1),
         [4] = rbb_lt(1,0),
         [5] = rbb_lt(0,2),
@@ -138,7 +138,7 @@ static void test_lt(void) {
 }
 
 static void test_le(void) {
-    struct rbb r = {3,5,6, {
+    struct rbb r = {3,6, {
         [3] = rbb_le(0,1),
         [4] = rbb_le(1,0),
         [5] = rbb_le(0,2),
@@ -151,7 +151,7 @@ static void test_le(void) {
 }
 
 static void test_sel(void) {
-    struct rbb r = {3,5,6, {
+    struct rbb r = {3,6, {
         [3] = rbb_imm(1.0f),
         [4] = rbb_sel(3,0,1),
         [5] = rbb_sel(2,0,1),
@@ -164,7 +164,7 @@ static void test_sel(void) {
 
 static void test_chain(void) {
     struct rbb foo = {
-        2,6,7, {
+        2,7, {
             [2] = rbb_add(0,1),
             [3] = rbb_sub(0,1),
             [4] = rbb_mul(2,3),
@@ -185,7 +185,7 @@ static void test_chain(void) {
 }
 
 static void test_max_capacity(void) {
-    struct rbb r = {.in=1, .out=63, .insts=64};
+    struct rbb r = {.in=1, .insts=64};
     float reg[64] = {0.0f};
 
     r.inst[1] = rbb_imm(1.0f);

@@ -1,7 +1,7 @@
 builddir = out
 
 cc = clang -O1
-#cc = clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all
+cc = clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all
 
 warn = -Weverything -Wno-poison-system-directories
 

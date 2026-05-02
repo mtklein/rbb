@@ -21,7 +21,7 @@ uint32_t rbb_le (int x, int y);
 uint32_t rbb_sel(int x, int y, int z);
 
 struct rbb {
-    int      in, out;
+    int      in;
     int      insts;
     uint32_t inst[64];
 };
