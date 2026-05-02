@@ -40,10 +40,10 @@ uint32_t rbb_min(int x, int y       ) { return (inst){.op=MIN, .x=x, .y=y,      
 uint32_t rbb_max(int x, int y       ) { return (inst){.op=MAX, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_fma(int x, int y, int z) { return (inst){.op=FMA, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
-uint32_t rbb_eq(int x, int y) { return (inst){.op=EQ , .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_ne(int x, int y) { return (inst){.op=NE , .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_lt(int x, int y) { return (inst){.op=LT , .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_le(int x, int y) { return (inst){.op=LE , .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_eq(int x, int y) { return (inst){.op=EQ, .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_ne(int x, int y) { return (inst){.op=NE, .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_lt(int x, int y) { return (inst){.op=LT, .x=x, .y=y, .hi=-1}.bits; }
+uint32_t rbb_le(int x, int y) { return (inst){.op=LE, .x=x, .y=y, .hi=-1}.bits; }
 
 uint32_t rbb_not(int x              ) { return (inst){.op=NOT, .x=x,             .hi=-1}.bits; }
 uint32_t rbb_and(int x, int y       ) { return (inst){.op=AND, .x=x, .y=y,       .hi=-1}.bits; }
