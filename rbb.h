@@ -20,14 +20,15 @@ uint32_t rbb_min(int x, int y);
 uint32_t rbb_max(int x, int y);
 uint32_t rbb_fma(int x, int y, int z);
 
-uint32_t rbb_eq (int x, int y);
-uint32_t rbb_ne (int x, int y);
-uint32_t rbb_lt (int x, int y);
-uint32_t rbb_le (int x, int y);
+uint32_t rbb_eq(int x, int y);
+uint32_t rbb_ne(int x, int y);
+uint32_t rbb_lt(int x, int y);
+uint32_t rbb_le(int x, int y);
 
 uint32_t rbb_not(int x);
 uint32_t rbb_and(int x, int y);
 uint32_t rbb_or (int x, int y);
+uint32_t rbb_xor(int x, int y);
 uint32_t rbb_sel(int x, int y, int z);
 
 uint32_t rbb_call(int ix);

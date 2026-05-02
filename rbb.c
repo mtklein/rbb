@@ -4,7 +4,7 @@ enum {
     ABS=1, NEG, SQRT, FLOOR, CEIL, TRUNC, ROUND,
     ADD, SUB, MUL, DIV, MIN, MAX, FMA,
     EQ, NE, LT, LE,
-    AND, OR, NOT, SEL,
+    AND, OR, XOR, NOT, SEL,
     CALL,
 };
 
@@ -48,6 +48,7 @@ uint32_t rbb_le(int x, int y) { return (inst){.op=LE, .x=x, .y=y, .hi=-1}.bits; 
 uint32_t rbb_not(int x              ) { return (inst){.op=NOT, .x=x,             .hi=-1}.bits; }
 uint32_t rbb_and(int x, int y       ) { return (inst){.op=AND, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_or (int x, int y       ) { return (inst){.op=OR , .x=x, .y=y,       .hi=-1}.bits; }
+uint32_t rbb_xor(int x, int y       ) { return (inst){.op=XOR, .x=x, .y=y,       .hi=-1}.bits; }
 uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
 
 uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
@@ -109,6 +110,7 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
 
             case AND: reg[i] = as_float( as_mask(reg[inst.x]) & as_mask(reg[inst.y])); break;
             case OR : reg[i] = as_float( as_mask(reg[inst.x]) | as_mask(reg[inst.y])); break;
+            case XOR: reg[i] = as_float( as_mask(reg[inst.x]) ^ as_mask(reg[inst.y])); break;
             case NOT: reg[i] = as_float(~as_mask(reg[inst.x])); break;
             case SEL: {
                 v8i const mask = as_mask(reg[inst.x]);

@@ -230,11 +230,13 @@ static void test_sel(void) {
 }
 
 static void test_bitwise(void) {
-    struct rbb r = {.in=2, .out=4, .insts=6, .inst={
+    struct rbb r = {.in=2, .out=6, .insts=8, .inst={
         [2] = rbb_eq (0,0),    // mask = ~0
         [3] = rbb_and(2,1),    // ~0 & v = v
         [4] = rbb_or (0,1),    //  0 | v = v
         [5] = rbb_not(0),      // ~0 = ~0
+        [6] = rbb_xor(2,2),    // m ^ m = 0
+        [7] = rbb_xor(2,0),    // ~0 ^ 0 = ~0
     }};
     float reg[64] = {0.0f, 0.5f};
     eval(&r, reg, NULL);
@@ -242,6 +244,8 @@ static void test_bitwise(void) {
     equiv  (reg[3], 0.5f) here;
     equiv  (reg[4], 0.5f) here;
     bits_eq(reg[5], ~0u)  here;
+    bits_eq(reg[6],  0u)  here;
+    bits_eq(reg[7], ~0u)  here;
 }
 
 static void test_sel_blend(void) {
@@ -442,11 +446,13 @@ static void test_evalv_cmp_and_sel(void) {
 }
 
 static void test_evalv_bitwise(void) {
-    struct rbb r = {.in=2, .out=4, .insts=6, .inst={
+    struct rbb r = {.in=2, .out=6, .insts=8, .inst={
         [2] = rbb_eq (0,0),
         [3] = rbb_and(2,1),
         [4] = rbb_or (0,1),
         [5] = rbb_not(0),
+        [6] = rbb_xor(2,2),
+        [7] = rbb_xor(2,0),
     }};
     v8f reg[64] = {
         [0] = {0,0,0,0,0,0,0,0},
@@ -458,6 +464,8 @@ static void test_evalv_bitwise(void) {
         equiv  (reg[3][j], reg[1][j])  here;
         equiv  (reg[4][j], reg[1][j])  here;
         bits_eq(reg[5][j], ~0u)        here;
+        bits_eq(reg[6][j],  0u)        here;
+        bits_eq(reg[7][j], ~0u)        here;
     }
 }
 
