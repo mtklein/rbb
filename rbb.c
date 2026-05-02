@@ -70,8 +70,8 @@ int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
-static v8i vf2u(v8f x) { return __builtin_bit_cast(v8i, x); }
-static v8f vu2f(v8i x) { return __builtin_bit_cast(v8f, x); }
+static v8i as_mask(v8f x) { return __builtin_bit_cast(v8i, x); }
+static v8f as_float(v8i x) { return __builtin_bit_cast(v8f, x); }
 
 void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64]) {
     for (int i = rbb->in; i < rbb->insts; i++) {
@@ -101,19 +101,19 @@ void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64])
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
-            case EQ:  reg[i] = vu2f(reg[inst.x] == reg[inst.y]); break;
-            case NE:  reg[i] = vu2f(reg[inst.x] != reg[inst.y]); break;
-            case LT:  reg[i] = vu2f(reg[inst.x] <  reg[inst.y]); break;
-            case LE:  reg[i] = vu2f(reg[inst.x] <= reg[inst.y]); break;
+            case EQ:  reg[i] = as_float(reg[inst.x] == reg[inst.y]); break;
+            case NE:  reg[i] = as_float(reg[inst.x] != reg[inst.y]); break;
+            case LT:  reg[i] = as_float(reg[inst.x] <  reg[inst.y]); break;
+            case LE:  reg[i] = as_float(reg[inst.x] <= reg[inst.y]); break;
         #pragma GCC diagnostic pop
 
-            case AND: reg[i] = vu2f( vf2u(reg[inst.x]) & vf2u(reg[inst.y])); break;
-            case OR : reg[i] = vu2f( vf2u(reg[inst.x]) | vf2u(reg[inst.y])); break;
-            case NOT: reg[i] = vu2f(~vf2u(reg[inst.x])); break;
+            case AND: reg[i] = as_float( as_mask(reg[inst.x]) & as_mask(reg[inst.y])); break;
+            case OR : reg[i] = as_float( as_mask(reg[inst.x]) | as_mask(reg[inst.y])); break;
+            case NOT: reg[i] = as_float(~as_mask(reg[inst.x])); break;
             case SEL: {
-                v8i const mask = vf2u(reg[inst.x]);
-                reg[i] = vu2f( ( mask & vf2u(reg[inst.y]))
-                             | (~mask & vf2u(reg[inst.z])));
+                v8i const mask = as_mask(reg[inst.x]);
+                reg[i] = as_float( ( mask & as_mask(reg[inst.y]))
+                                 | (~mask & as_mask(reg[inst.z])));
             } break;
 
             case CALL: {
