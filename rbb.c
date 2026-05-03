@@ -16,7 +16,7 @@ struct rbb {
     struct rbb_inst inst[];
 };
 
-static int const arity[] = {
+static uint8_t const arity[] = {
     [NEG]=1, [ABS]=1, [SQRT]=1, [FLOOR]=1, [CEIL]=1, [TRUNC]=1, [ROUND]=1,
     [ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MIN]=2, [MAX]=2, [FMA]=3,
     [EQ]=2,  [LT]=2,  [LE]=2,
@@ -38,7 +38,7 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
         if (d          > 0) { bytes += (size_t)(8*(callee->in + callee->out)); }
         return bytes;
     }
-    static size_t const op_size[] = {
+    static uint8_t const op_size[] = {
         [IMM]=16,
         [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
         [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=8,
