@@ -68,14 +68,46 @@ static uint32_t enc_FADD_4S(int rd, int rn, int rm) {
          | ((uint32_t)(rd & 0x1F)      );
 }
 
+// STP <Dt1>, <Dt2>, [SP, #-16]!  pre-indexed (push pair, scaled by 8)
+static uint32_t enc_STP_D_pre(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset / 8;
+    return 0x6D800000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+// LDP <Dt1>, <Dt2>, [SP], #16    post-indexed (pop pair)
+static uint32_t enc_LDP_D_post(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset / 8;
+    return 0x6CC00000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+
+static uint32_t enc_RET(void) {
+    return 0xD65F03C0;
+}
+
+// Number of D-pairs we must save: V8..V15 lower 64 bits are callee-saved per AAPCS64.
+static int callee_saved_pairs(int regs) {
+    return regs <= 4 ? 0 :
+           regs <= 8 ? regs - 4 : 4;
+}
+
 static void emit_jit(struct rbb const *bb, void *buf) {
+    enum { x0=0, sp=31 };
     uint32_t *out = buf;
 
-    // Prologue: load each rbb register from x0[#offset] into a Q pair.
-    for (int r = 0; r < bb->regs; r++) {
-        *out++ = enc_LDP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+    int const save_pairs = callee_saved_pairs(bb->regs);
+    for (int k = 0; k < save_pairs; k++) {
+        *out++ = enc_STP_D_pre(2*k+8, 2*k+9, sp, -16);
     }
-
+    for (int r = 0; r < bb->in; r++) {
+        *out++ = enc_LDP_Q(2*r, 2*r+1, x0, 32*r);
+    }
     for (int i = 0; i < bb->insts; i++) {
         struct rbb_inst const *ip = bb->inst + i;
         switch (ip->op) {
@@ -94,12 +126,13 @@ static void emit_jit(struct rbb const *bb, void *buf) {
                 __builtin_unreachable();  // jit_size > 0 implies all ops supported
         }
     }
-
-    // Epilogue: store each rbb register back to x0[#offset], then return.
-    for (int r = 0; r < bb->regs; r++) {
-        *out++ = enc_STP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+    for (int r = 0; r < bb->out; r++) {
+        *out++ = enc_STP_Q(2*r, 2*r+1, x0, 32*r);
     }
-    *out++ = 0xD65F03C0u;  // RET
+    for (int k = save_pairs; k --> 0;) {
+        *out++ = enc_LDP_D_post(2*k+8, 2*k+9, sp, 16);
+    }
+    *out++ = enc_RET();
 
     assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size );
 }
@@ -164,9 +197,11 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     free(meta);
 
-    // jit_size: prologue (LDP per reg) + body (per-op) + epilogue (STP per reg) + RET
+    // jit_size:
+    //   save callee-saved D pairs + LDP per input + body + STP per output + restore Ds + RET
     if (rbb->regs <= MAX_JIT_REGS) {
-        rbb->jit_size += (size_t)(8 * rbb->regs) + 4;
+        int const save_pairs = callee_saved_pairs(rbb->regs);
+        rbb->jit_size += 4 * (size_t)(save_pairs + rbb->in + rbb->out + save_pairs + 1);
         for (int i = 0; i < rbb->insts; i++) {
             if (can_jit(rbb->inst[i].op)) {
                 rbb->jit_size += jit_op_size[rbb->inst[i].op];
@@ -178,11 +213,11 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     }
 
     if (rbb->jit_size > 0) {
-        void *buf = mmap(NULL, rbb->jit_size, PROT_READ|PROT_WRITE,
-                         MAP_ANON|MAP_PRIVATE, -1, 0);
+        void *buf = mmap(NULL, rbb->jit_size,
+                         PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
             emit_jit(rbb, buf);
-            if (mprotect(buf, rbb->jit_size, PROT_READ|PROT_EXEC) == 0) {
+            if (0 == mprotect(buf, rbb->jit_size, PROT_READ|PROT_EXEC)) {
                 __builtin___clear_cache(buf, (char*)buf + rbb->jit_size);
                 rbb->jit = buf;
             } else {
