@@ -147,14 +147,6 @@ static void test_EQ(void) {
     rbb_free(bb);
 }
 
-static void test_NE(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=NE, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {42, 47};
-    rbb_eval(bb, reg);
-    exact(reg[0].x, T) here;
-    rbb_free(bb);
-}
-
 static void test_LT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=LT, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {3, 5};
@@ -342,7 +334,6 @@ int main(void) {
     test_MAX();
     test_FMA();
     test_EQ();
-    test_NE();
     test_LT();
     test_LE();
     test_AND();

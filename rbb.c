@@ -20,7 +20,7 @@ struct rbb {
 static int const arity[] = {
     [NEG]=1, [ABS]=1, [SQRT]=1, [FLOOR]=1, [CEIL]=1, [TRUNC]=1, [ROUND]=1,
     [ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MIN]=2, [MAX]=2, [FMA]=3,
-    [EQ]=2,  [NE]=2,  [LT]=2,  [LE]=2,
+    [EQ]=2,  [LT]=2,  [LE]=2,
     [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
 };
 
@@ -46,7 +46,7 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
         [IMM]=20,
         [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
         [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=24,
-        [EQ]=8,  [NE]=16, [LT]=8,  [LE]=8,
+        [EQ]=8,  [LT]=8,  [LE]=8,
         [AND]=8, [OR]=8,  [XOR]=8, [NOT]=8,
     };
     return op_size[ip->op];
@@ -226,13 +226,6 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
             case LT: case LE:
                 *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d,   2*ip->y,   2*ip->x);
                 *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d+1, 2*ip->y+1, 2*ip->x+1);
-                break;
-
-            case NE:
-                *out++ = enc_three_reg(enc_op[EQ],  2*ip->d,   2*ip->x,   2*ip->y);
-                *out++ = enc_two_reg  (enc_op[NOT], 2*ip->d,   2*ip->d);
-                *out++ = enc_three_reg(enc_op[EQ],  2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
-                *out++ = enc_two_reg  (enc_op[NOT], 2*ip->d+1, 2*ip->d+1);
                 break;
 
             case NEG: case ABS: case NOT:
@@ -493,7 +486,6 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
             case EQ:    d = (v8f)(reg[ip->x] == reg[ip->y]); break;
-            case NE:    d = (v8f)(reg[ip->x] != reg[ip->y]); break;
             case LT:    d = (v8f)(reg[ip->x] <  reg[ip->y]); break;
             case LE:    d = (v8f)(reg[ip->x] <= reg[ip->y]); break;
         #pragma GCC diagnostic pop

@@ -8,7 +8,7 @@ enum rbb_op {
     IMM,
     NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND,
     ADD, SUB, MUL, DIV, MIN, MAX, FMA,
-    EQ, NE, LT, LE,
+    EQ, LT, LE,
     AND, OR, XOR, NOT, SEL,
     CALL,
 };
