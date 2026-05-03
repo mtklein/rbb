@@ -22,13 +22,12 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     struct rbb *rbb = calloc(1, sizeof *rbb + inst_size);
 
-    int max = 0;
+    int max = -1;
     while (insts --> 0) {
         max = inst->d > max ? inst->d : max;
-        max = inst->x > max ? inst->x : max;
-        max = inst->y > max ? inst->y : max;
-        max = inst->z > max ? inst->z : max;
-
+        for (short const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
+            max = *arg > max ? *arg : max;
+        }
         rbb->inst[rbb->insts++] = *inst++;
     }
     int const regs = max+1;
@@ -62,6 +61,14 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
 void rbb_free(struct rbb *rbb) {
     free(rbb);
+}
+
+struct rbb_meta rbb_meta(struct rbb const *bb) {
+    return (struct rbb_meta){
+        .inputs    = bb->in,
+        .outputs   = bb->out,
+        .registers = bb->regs,
+    };
 }
 
 void rbb_eval(struct rbb const *rbb, v8f reg[]) {

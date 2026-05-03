@@ -20,6 +20,9 @@ struct rbb_inst {
     struct rbb const *call;
 };
 
-struct rbb* rbb(struct rbb_inst const inst[], int insts);
-void   rbb_free(struct rbb*);
-void   rbb_eval(struct rbb const*, v8f reg[]);
+struct rbb_meta { int inputs, outputs, registers; };
+
+struct rbb*     rbb(struct rbb_inst const inst[], int insts);
+struct rbb_meta rbb_meta(struct rbb const*);
+void            rbb_eval(struct rbb const*, v8f reg[]);
+void            rbb_free(struct rbb*);

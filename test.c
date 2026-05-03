@@ -211,6 +211,58 @@ static void test_SEL(void) {
     rbb_free(bb);
 }
 
+static void check_meta(struct rbb const *bb, int inputs, int outputs, int registers) {
+    struct rbb_meta const m = rbb_meta(bb);
+    m.inputs    == inputs    here;
+    m.outputs   == outputs   here;
+    m.registers == registers here;
+}
+
+static void test_meta_empty(void) {
+    struct rbb *bb = rbb(NULL, 0);
+    check_meta(bb, 0,0,0);
+    rbb_free(bb);
+}
+
+static void test_meta_no_inputs(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=42}, 1);
+    check_meta(bb, 0,1,1);
+    rbb_free(bb);
+}
+
+static void test_meta_repeated_source(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
+    check_meta(bb, 1,1,1);
+    rbb_free(bb);
+}
+
+static void test_meta_in_place(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
+    check_meta(bb, 1,1,1);
+    rbb_free(bb);
+}
+
+static void test_meta_read_after_write(void) {
+    struct rbb_inst const inst[] = {
+        {.op=IMM, .d=2, .imm=1},
+        {.op=NEG, .d=0, .x=2},
+    };
+    struct rbb *bb = rbb(inst, 2);
+    check_meta(bb, 0,1,3);
+    rbb_free(bb);
+}
+
+static void test_meta_write_read_rewrite(void) {
+    struct rbb_inst const inst[] = {
+        {.op=IMM, .d=0, .imm=5},
+        {.op=NEG, .d=1, .x=0},
+        {.op=IMM, .d=0, .imm=10},
+    };
+    struct rbb *bb = rbb(inst, 3);
+    check_meta(bb, 0,2,2);
+    rbb_free(bb);
+}
+
 int main(void) {
     test_IMM();
     test_NEG();
@@ -236,5 +288,12 @@ int main(void) {
     test_XOR();
     test_NOT();
     test_SEL();
+
+    test_meta_empty();
+    test_meta_no_inputs();
+    test_meta_repeated_source();
+    test_meta_in_place();
+    test_meta_read_after_write();
+    test_meta_write_read_rewrite();
     return 0;
 }
