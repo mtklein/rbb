@@ -1,148 +1,65 @@
 #include "rbb.h"
-
-enum {
-    ABS=1, NEG, SQRT, FLOOR, CEIL, TRUNC, ROUND,
-    ADD, SUB, MUL, DIV, MIN, MAX, FMA,
-    EQ, NE, LT, LE,
-    AND, OR, XOR, NOT, SEL,
-    CALL,
-};
-
-typedef union {
-    uint32_t bits;
-    float    imm;
-    struct {
-        uint32_t op : 5,
-                  x : 6,
-                  y : 6,
-                  z : 6,
-                 hi : 9;
-    };
-} inst;
-
-uint32_t rbb_imm(float imm) { return (inst){.imm=imm}.bits; }
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-uint32_t rbb_abs  (int x) { return (inst){.op=ABS  , .x=x, .hi=-1}.bits; }
-uint32_t rbb_neg  (int x) { return (inst){.op=NEG  , .x=x, .hi=-1}.bits; }
-uint32_t rbb_sqrt (int x) { return (inst){.op=SQRT , .x=x, .hi=-1}.bits; }
-uint32_t rbb_floor(int x) { return (inst){.op=FLOOR, .x=x, .hi=-1}.bits; }
-uint32_t rbb_ceil (int x) { return (inst){.op=CEIL , .x=x, .hi=-1}.bits; }
-uint32_t rbb_trunc(int x) { return (inst){.op=TRUNC, .x=x, .hi=-1}.bits; }
-uint32_t rbb_round(int x) { return (inst){.op=ROUND, .x=x, .hi=-1}.bits; }
-
-uint32_t rbb_add(int x, int y       ) { return (inst){.op=ADD, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_sub(int x, int y       ) { return (inst){.op=SUB, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_mul(int x, int y       ) { return (inst){.op=MUL, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_div(int x, int y       ) { return (inst){.op=DIV, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_min(int x, int y       ) { return (inst){.op=MIN, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_max(int x, int y       ) { return (inst){.op=MAX, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_fma(int x, int y, int z) { return (inst){.op=FMA, .x=x, .y=y, .z=z, .hi=-1}.bits; }
-
-uint32_t rbb_eq(int x, int y) { return (inst){.op=EQ, .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_ne(int x, int y) { return (inst){.op=NE, .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_lt(int x, int y) { return (inst){.op=LT, .x=x, .y=y, .hi=-1}.bits; }
-uint32_t rbb_le(int x, int y) { return (inst){.op=LE, .x=x, .y=y, .hi=-1}.bits; }
-
-uint32_t rbb_not(int x              ) { return (inst){.op=NOT, .x=x,             .hi=-1}.bits; }
-uint32_t rbb_and(int x, int y       ) { return (inst){.op=AND, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_or (int x, int y       ) { return (inst){.op=OR , .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_xor(int x, int y       ) { return (inst){.op=XOR, .x=x, .y=y,       .hi=-1}.bits; }
-uint32_t rbb_sel(int x, int y, int z) { return (inst){.op=SEL, .x=x, .y=y, .z=z, .hi=-1}.bits; }
-
-uint32_t rbb_call(int ix) { return (inst){.op=CALL, .x=ix, .hi=-1}.bits; }
-
-int rbb_inline(struct rbb *dst, struct rbb const *src, int const args[]) {
-    int const offset = dst->insts - src->in;
-    for (int k = src->in; k < src->insts; k++) {
-        inst si = {.bits = src->inst[k]};
-        if (!(si.imm <= si.imm) && si.op != CALL) {
-            si.x = si.x < (uint32_t)src->in ? (uint32_t)args[si.x] : si.x + (uint32_t)offset;
-            si.y = si.y < (uint32_t)src->in ? (uint32_t)args[si.y] : si.y + (uint32_t)offset;
-            si.z = si.z < (uint32_t)src->in ? (uint32_t)args[si.z] : si.z + (uint32_t)offset;
-        }
-        dst->inst[dst->insts++] = si.bits;
-    }
-    return dst->insts - src->out;
-}
-#pragma GCC diagnostic pop
-
+#include <stdlib.h>
+#include <string.h>
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
-static v8i as_mask(v8f x) { return __builtin_bit_cast(v8i, x); }
-static v8f as_float(v8i x) { return __builtin_bit_cast(v8f, x); }
+struct rbb {
+    int             insts;
+    struct rbb_inst inst[];
+};
 
-void evalv(struct rbb const *rbb, v8f reg[64], struct rbb const *const call[64]) {
-    for (int i = rbb->in; i < rbb->insts; i++) {
-        inst const inst = {.bits=rbb->inst[i]};
+struct rbb* rbb(struct rbb_inst const inst[], int insts) {
+    size_t const inst_size = (size_t)insts * sizeof *inst;
 
-        if (inst.imm <= inst.imm) {
-            reg[i] = inst.imm;
-        } else switch (inst.op) {
-            default: __builtin_unreachable();
+    struct rbb *rbb = malloc(sizeof *rbb + inst_size);
+    rbb->insts = insts;
+    memcpy(rbb->inst, inst, inst_size);
+    return rbb;
+}
 
-            case   ABS: reg[i] = __builtin_elementwise_abs  (reg[inst.x]); break;
-            case   NEG: reg[i] =                           -(reg[inst.x]); break;
-            case  SQRT: reg[i] = __builtin_elementwise_sqrt (reg[inst.x]); break;
-            case FLOOR: reg[i] = __builtin_elementwise_floor(reg[inst.x]); break;
-            case  CEIL: reg[i] = __builtin_elementwise_ceil (reg[inst.x]); break;
-            case TRUNC: reg[i] = __builtin_elementwise_trunc(reg[inst.x]); break;
-            case ROUND: reg[i] = __builtin_elementwise_round(reg[inst.x]); break;
+void rbb_free(struct rbb *rbb) {
+    free(rbb);
+}
 
-            case ADD: reg[i] = reg[inst.x] + reg[inst.y]; break;
-            case SUB: reg[i] = reg[inst.x] - reg[inst.y]; break;
-            case MUL: reg[i] = reg[inst.x] * reg[inst.y]; break;
-            case DIV: reg[i] = reg[inst.x] / reg[inst.y]; break;
-            case MIN: reg[i] = __builtin_elementwise_min(reg[inst.x], reg[inst.y]); break;
-            case MAX: reg[i] = __builtin_elementwise_max(reg[inst.x], reg[inst.y]); break;
-            case FMA: reg[i] = __builtin_elementwise_fma(reg[inst.x], reg[inst.y], reg[inst.z]);
-                               break;
+void rbb_eval(struct rbb const *rbb, v8f reg[]) {
+    for (int i = 0; i < rbb->insts; i++) {
+        struct rbb_inst const *ip = rbb->inst + i;
+        v8f d = {0};
+        switch (ip->op) {
+            case IMM:   d = ip->imm; break;
+
+            case NEG:   d = -(reg[ip->x]); break;
+            case ABS:   d = __builtin_elementwise_abs  (reg[ip->x]); break;
+            case SQRT:  d = __builtin_elementwise_sqrt (reg[ip->x]); break;
+            case FLOOR: d = __builtin_elementwise_floor(reg[ip->x]); break;
+            case CEIL:  d = __builtin_elementwise_ceil (reg[ip->x]); break;
+            case TRUNC: d = __builtin_elementwise_trunc(reg[ip->x]); break;
+            case ROUND: d = __builtin_elementwise_round(reg[ip->x]); break;
+
+            case ADD:   d = reg[ip->x] + reg[ip->y]; break;
+            case SUB:   d = reg[ip->x] - reg[ip->y]; break;
+            case MUL:   d = reg[ip->x] * reg[ip->y]; break;
+            case DIV:   d = reg[ip->x] / reg[ip->y]; break;
+            case MIN:   d = __builtin_elementwise_min(reg[ip->x], reg[ip->y]); break;
+            case MAX:   d = __builtin_elementwise_max(reg[ip->x], reg[ip->y]); break;
+            case FMA:   d = __builtin_elementwise_fma(reg[ip->x], reg[ip->y], reg[ip->z]); break;
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
-            case EQ:  reg[i] = as_float(reg[inst.x] == reg[inst.y]); break;
-            case NE:  reg[i] = as_float(reg[inst.x] != reg[inst.y]); break;
-            case LT:  reg[i] = as_float(reg[inst.x] <  reg[inst.y]); break;
-            case LE:  reg[i] = as_float(reg[inst.x] <= reg[inst.y]); break;
+            case EQ:    d = (v8f)(reg[ip->x] == reg[ip->y]); break;
+            case NE:    d = (v8f)(reg[ip->x] != reg[ip->y]); break;
+            case LT:    d = (v8f)(reg[ip->x] <  reg[ip->y]); break;
+            case LE:    d = (v8f)(reg[ip->x] <= reg[ip->y]); break;
         #pragma GCC diagnostic pop
 
-            case AND: reg[i] = as_float( as_mask(reg[inst.x]) & as_mask(reg[inst.y])); break;
-            case OR : reg[i] = as_float( as_mask(reg[inst.x]) | as_mask(reg[inst.y])); break;
-            case XOR: reg[i] = as_float( as_mask(reg[inst.x]) ^ as_mask(reg[inst.y])); break;
-            case NOT: reg[i] = as_float(~as_mask(reg[inst.x])); break;
-            case SEL: {
-                v8i const mask = as_mask(reg[inst.x]);
-                reg[i] = as_float( ( mask & as_mask(reg[inst.y]))
-                                 | (~mask & as_mask(reg[inst.z])));
-            } break;
-
-            case CALL: {
-                struct rbb const *sub = call[inst.x];
-                int const in  = sub->in;
-                int const out = sub->out;
-                v8f subreg[64] = {0};
-                for (int j = 0; j < in; j++) {
-                    subreg[j] = reg[i - in + j];
-                }
-                evalv(sub, subreg, call);
-                for (int j = 0; j < out; j++) {
-                    reg[i + j] = subreg[sub->insts - out + j];
-                }
-                i += out - 1;
-            } break;
+            case AND:   d = (v8f)( (v8i)reg[ip->x] & (v8i)reg[ip->y] ); break;
+            case OR:    d = (v8f)( (v8i)reg[ip->x] | (v8i)reg[ip->y] ); break;
+            case XOR:   d = (v8f)( (v8i)reg[ip->x] ^ (v8i)reg[ip->y] ); break;
+            case NOT:   d = (v8f)(~(v8i)reg[ip->x]); break;
+            case SEL:   d = (v8f)( ( (v8i)reg[ip->x] & (v8i)reg[ip->y])
+                                 | (~(v8i)reg[ip->x] & (v8i)reg[ip->z]) ); break;
         }
-    }
-}
-
-void eval(struct rbb const *rbb, float reg[64], struct rbb const *const call[64]) {
-    v8f vreg[64];
-    for (int j = 0; j < rbb->in; j++) {
-        vreg[j] = reg[j];
-    }
-    evalv(rbb, vreg, call);
-    for (int i = rbb->in; i < rbb->insts; i++) {
-        reg[i] = vreg[i][0];
+        reg[ip->d] = d;
     }
 }

@@ -3,10 +3,10 @@ builddir = out
 cc = clang -O1
 cc = clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all
 
-warn = -Weverything -Wno-poison-system-directories
+warn = -Weverything -Wno-implicit-void-ptr-cast -Wno-poison-system-directories -Wno-switch-default
 
 rule compile
-    command = ccache $cc -g -Werror $warn -MD -MF $out.d -c $in -o $out
+    command = ccache $cc -g -fcolor-diagnostics -Werror $warn -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
