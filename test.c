@@ -318,7 +318,8 @@ static void test_jit_supported(void) {
 }
 
 static void test_jit_unsupported(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
+    // Programs that need more than MAX_JIT_REGS logical registers fall back to interp.
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=20, .x=20, .y=20}, 1);
     struct rbb_meta meta = rbb_meta(bb);
     !meta.jit here;
     rbb_free(bb);
