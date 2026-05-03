@@ -23,12 +23,11 @@ struct rbb_inst {
 };
 
 struct rbb_meta {
-    int    inputs, outputs, registers, :32;
-    size_t jit_size;
+    int inputs, outputs, registers;
+    _Bool jit, pad[3];
 };
 
 struct rbb*     rbb(struct rbb_inst const inst[], int insts);
 struct rbb_meta rbb_meta(struct rbb const*);
 void            rbb_eval(struct rbb const*, v8f reg[]);
-_Bool           rbb_jit (struct rbb const*, void*);
 void            rbb_free(struct rbb*);

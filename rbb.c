@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
@@ -9,6 +11,7 @@ typedef int v8i __attribute__((ext_vector_type(8)));
 
 struct rbb {
     int             insts,in,out,regs;
+    void           *jit;
     size_t          jit_size;
     struct rbb_inst inst[];
 };
@@ -33,6 +36,72 @@ static size_t const jit_op_size[] = {
 };
 static _Bool can_jit(enum rbb_op op) {
     return jit_op_size[op] > 0;
+}
+
+// AArch64 instruction encoders.  Rt/Rt2/Rn/Rd/Rm fit in 5 bits.
+//
+// LDP <Qt1>, <Qt2>, [<Xn>, #imm]   imm signed 7-bit, scaled by 16
+// STP same with bit 22 (L) cleared
+// FADD <Vd>.4S, <Vn>.4S, <Vm>.4S
+// RET (default Xn=x30) = 0xD65F03C0
+
+static uint32_t enc_LDP_Q(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset >> 4;
+    return 0xAD400000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+static uint32_t enc_STP_Q(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset >> 4;
+    return 0xAD000000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+static uint32_t enc_FADD_4S(int rd, int rn, int rm) {
+    return 0x4E20D400u
+         | ((uint32_t)(rm & 0x1F) << 16)
+         | ((uint32_t)(rn & 0x1F) <<  5)
+         | ((uint32_t)(rd & 0x1F)      );
+}
+
+static void emit_jit(struct rbb const *bb, void *buf) {
+    uint32_t *out = buf;
+
+    // Prologue: load each rbb register from x0[#offset] into a Q pair.
+    for (int r = 0; r < bb->regs; r++) {
+        *out++ = enc_LDP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+    }
+
+    for (int i = 0; i < bb->insts; i++) {
+        struct rbb_inst const *ip = bb->inst + i;
+        switch (ip->op) {
+            case ADD:
+                *out++ = enc_FADD_4S(2*ip->d,   2*ip->x,   2*ip->y);
+                *out++ = enc_FADD_4S(2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                break;
+
+            case IMM:
+            case NEG: case ABS: case SQRT: case FLOOR:
+            case CEIL: case TRUNC: case ROUND:
+            case SUB: case MUL: case DIV: case MIN: case MAX: case FMA:
+            case EQ: case NE: case LT: case LE:
+            case AND: case OR: case XOR: case NOT: case SEL:
+            case CALL:
+                __builtin_unreachable();  // jit_size > 0 implies all ops supported
+        }
+    }
+
+    // Epilogue: store each rbb register back to x0[#offset], then return.
+    for (int r = 0; r < bb->regs; r++) {
+        *out++ = enc_STP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+    }
+    *out++ = 0xD65F03C0u;  // RET
+
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size );
 }
 
 struct rbb* rbb(struct rbb_inst const inst[], int insts) {
@@ -108,11 +177,28 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         }
     }
 
+    if (rbb->jit_size > 0) {
+        void *buf = mmap(NULL, rbb->jit_size, PROT_READ|PROT_WRITE,
+                         MAP_ANON|MAP_PRIVATE, -1, 0);
+        if (buf != MAP_FAILED) {
+            emit_jit(rbb, buf);
+            if (mprotect(buf, rbb->jit_size, PROT_READ|PROT_EXEC) == 0) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size);
+                rbb->jit = buf;
+            } else {
+                munmap(buf, rbb->jit_size);
+            }
+        }
+    }
+
     return rbb;
 }
 
-void rbb_free(struct rbb *rbb) {
-    free(rbb);
+void rbb_free(struct rbb *bb) {
+    if (bb->jit) {
+        munmap(bb->jit, bb->jit_size);
+    }
+    free(bb);
 }
 
 struct rbb_meta rbb_meta(struct rbb const *bb) {
@@ -120,11 +206,18 @@ struct rbb_meta rbb_meta(struct rbb const *bb) {
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
-        .jit_size  = bb->jit_size,
+        .jit       = bb->jit != NULL,
     };
 }
 
 void rbb_eval(struct rbb const *rbb, v8f reg[]) {
+    if (rbb->jit) {
+        void (*fn)(v8f*);
+        memcpy(&fn, &rbb->jit, sizeof fn);
+        fn(reg);
+        return;
+    }
+
     for (int i = 0; i < rbb->insts; i++) {
         struct rbb_inst const *ip = rbb->inst + i;
         v8f d = {0};
@@ -166,74 +259,4 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
         }
         reg[ip->d] = d;
     }
-}
-
-// AArch64 instruction encoders.  Rt/Rt2/Rn/Rd/Rm fit in 5 bits.
-//
-// LDP <Qt1>, <Qt2>, [<Xn>, #imm]   imm signed 7-bit, scaled by 16
-// STP same with bit 22 (L) cleared
-// FADD <Vd>.4S, <Vn>.4S, <Vm>.4S
-// RET (default Xn=x30) = 0xD65F03C0
-
-static uint32_t enc_LDP_Q(int rt, int rt2, int rn, int offset) {
-    int const imm7 = offset >> 4;
-    return 0xAD400000u
-         | ((uint32_t)(imm7 & 0x7F) << 15)
-         | ((uint32_t)(rt2  & 0x1F) << 10)
-         | ((uint32_t)(rn   & 0x1F) <<  5)
-         | ((uint32_t)(rt   & 0x1F)      );
-}
-static uint32_t enc_STP_Q(int rt, int rt2, int rn, int offset) {
-    int const imm7 = offset >> 4;
-    return 0xAD000000u
-         | ((uint32_t)(imm7 & 0x7F) << 15)
-         | ((uint32_t)(rt2  & 0x1F) << 10)
-         | ((uint32_t)(rn   & 0x1F) <<  5)
-         | ((uint32_t)(rt   & 0x1F)      );
-}
-static uint32_t enc_FADD_4S(int rd, int rn, int rm) {
-    return 0x4E20D400u
-         | ((uint32_t)(rm & 0x1F) << 16)
-         | ((uint32_t)(rn & 0x1F) <<  5)
-         | ((uint32_t)(rd & 0x1F)      );
-}
-
-_Bool rbb_jit(struct rbb const *bb, void *buf) {
-    uint32_t *out = buf;
-    if (bb->jit_size) {
-        // Prologue: load each rbb register from x0[#offset] into a Q pair.
-        for (int r = 0; r < bb->regs; r++) {
-            *out++ = enc_LDP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
-        }
-
-        for (int i = 0; i < bb->insts; i++) {
-            struct rbb_inst const *ip = bb->inst + i;
-            switch (ip->op) {
-                case ADD:
-                    *out++ = enc_FADD_4S(2*ip->d,   2*ip->x,   2*ip->y);
-                    *out++ = enc_FADD_4S(2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
-                    break;
-
-                case IMM:
-                case NEG: case ABS: case SQRT: case FLOOR:
-                case CEIL: case TRUNC: case ROUND:
-                case SUB: case MUL: case DIV: case MIN: case MAX: case FMA:
-                case EQ: case NE: case LT: case LE:
-                case AND: case OR: case XOR: case NOT: case SEL:
-                case CALL:
-                    return 0;
-            }
-        }
-
-        // Epilogue: store each rbb register back to x0[#offset], then return.
-        for (int r = 0; r < bb->regs; r++) {
-            *out++ = enc_STP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
-        }
-        *out++ = 0xD65F03C0u;  // RET
-        return 1;
-    }
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size );
-    return 0;
-
-
 }
