@@ -132,8 +132,9 @@ static void test_MAX(void) {
 }
 
 static void test_FMA(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=FMA, .d=0, .x=0, .y=1, .z=2}, 1);
-    v8f reg[] = {2, 3, 4};
+    // FMA d += x*y :  reg[0] = reg[0] + reg[1] * reg[2] = 4 + 2*3 = 10.
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=FMA, .d=0, .x=1, .y=2}, 1);
+    v8f reg[] = {4, 2, 3};
     rbb_eval(bb, reg);
     exact(reg[0].x, 10) here;
     rbb_free(bb);
@@ -196,7 +197,8 @@ static void test_NOT(void) {
 }
 
 static void test_SEL(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=SEL, .d=0, .x=0, .y=1, .z=2}, 1);
+    // SEL d = d ? x : y :  reg[0] = reg[0] ? reg[1] : reg[2] = T ? 1 : 2 = 1.
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=SEL, .d=0, .x=1, .y=2}, 1);
     v8f reg[] = {T, 1, 2};
     rbb_eval(bb, reg);
     exact(reg[0].x, 1) here;

@@ -1,6 +1,5 @@
 #include "rbb.h"
 #include <assert.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -25,9 +24,6 @@ static int const arity[] = {
 };
 
 static size_t jit_inst_size(struct rbb_inst const *ip) {
-    if (ip->op == SEL) {
-        return (ip->d == ip->x || ip->d == ip->y || ip->d == ip->z) ? 8 : 16;
-    }
     if (ip->op == CALL) {
         // ADRP+ADD+BLR is always 12 bytes.  We additionally need:
         //   - frame + saves + restores for caller's V[0..2*min(d,cregs)-1]
@@ -45,9 +41,9 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
     static size_t const op_size[] = {
         [IMM]=20,
         [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
-        [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=24,
+        [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=8,
         [EQ]=8,  [LT]=8,  [LE]=8,
-        [AND]=8, [OR]=8,  [XOR]=8, [NOT]=8,
+        [AND]=8, [OR]=8,  [XOR]=8, [NOT]=8, [SEL]=8,
     };
     return op_size[ip->op];
 }
@@ -171,13 +167,6 @@ static _Bool has_op(struct rbb const *bb, enum rbb_op op) {
     return 0;
 }
 
-// FMA needs V30/V31 as a scratch pair, so programs that use FMA can only use
-// 15 logical registers (V0..V29) instead of the usual 16 (V0..V31).
-static int max_jit_regs(struct rbb const *bb) {
-    return has_op(bb, FMA) ? MAX_JIT_REGS - 1
-                           : MAX_JIT_REGS;
-}
-
 // Returns the offset of the kernel within buf (= trampoline_size).
 static size_t emit_jit(struct rbb const *bb, void *buf) {
     enum { X0=0, SP=31, X16=16 };
@@ -234,41 +223,17 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                 *out++ = enc_two_reg(enc_op[ip->op], 2*ip->d+1, 2*ip->x+1);
                 break;
 
-            case FMA: {
-                int const d0=2*ip->d, d1=d0+1;
-                int const xL=2*ip->x, xH=xL+1;
-                int const yL=2*ip->y, yH=yL+1;
-                int const zL=2*ip->z, zH=zL+1;
-                enum { sLo=30, sHi=31 };
-                *out++ = enc_three_reg(enc_op[OR],  sLo, zL, zL);
-                *out++ = enc_three_reg(enc_op[FMA], sLo, xL, yL);
-                *out++ = enc_three_reg(enc_op[OR],  d0,  sLo, sLo);
-                *out++ = enc_three_reg(enc_op[OR],  sHi, zH, zH);
-                *out++ = enc_three_reg(enc_op[FMA], sHi, xH, yH);
-                *out++ = enc_three_reg(enc_op[OR],  d1,  sHi, sHi);
-            } break;
+            case FMA:
+                // FMLA Vd, Vx, Vy : Vd += Vx * Vy.
+                *out++ = enc_three_reg(enc_op[FMA], 2*ip->d,   2*ip->x,   2*ip->y);
+                *out++ = enc_three_reg(enc_op[FMA], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                break;
 
-            case SEL: {
-                int const d0=2*ip->d, d1=d0+1;
-                int const xL=2*ip->x, xH=xL+1;
-                int const yL=2*ip->y, yH=yL+1;
-                int const zL=2*ip->z, zH=zL+1;
-                if (ip->d == ip->x) {
-                    *out++ = enc_three_reg(0x6E601C00, d0, yL, zL);
-                    *out++ = enc_three_reg(0x6E601C00, d1, yH, zH);
-                } else if (ip->d == ip->y) {
-                    *out++ = enc_three_reg(0x6EE01C00, d0, zL, xL);
-                    *out++ = enc_three_reg(0x6EE01C00, d1, zH, xH);
-                } else if (ip->d == ip->z) {
-                    *out++ = enc_three_reg(0x6EA01C00, d0, yL, xL);
-                    *out++ = enc_three_reg(0x6EA01C00, d1, yH, xH);
-                } else {
-                    *out++ = enc_three_reg(enc_op[OR], d0, xL, xL);
-                    *out++ = enc_three_reg(0x6E601C00,  d0, yL, zL);
-                    *out++ = enc_three_reg(enc_op[OR], d1, xH, xH);
-                    *out++ = enc_three_reg(0x6E601C00,  d1, yH, zH);
-                }
-            } break;
+            case SEL:
+                // BSL Vd, Vx, Vy : Vd = (Vd & Vx) | (~Vd & Vy)  (mask = Vd).
+                *out++ = enc_three_reg(0x6E601C00, 2*ip->d,   2*ip->x,   2*ip->y);
+                *out++ = enc_three_reg(0x6E601C00, 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                break;
 
             case IMM: {
                 int const d0 = 2*ip->d, d1 = d0+1;
@@ -349,7 +314,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
             max = top > max ? top : max;
         } else {
             max = inst->d > max ? inst->d : max;
-            for (short const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
+            for (uint8_t const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
                 max = *arg > max ? *arg : max;
             }
         }
@@ -378,7 +343,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
                 meta[r].output  = 1;
             }
         } else {
-            for (short const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
+            for (uint8_t const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
                 if (!meta[*arg].written) {
                     meta[*arg].input = 1;
                 }
@@ -401,7 +366,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     //   trampoline (PUSH FP/LR + save Ds + LDP inputs + BL kernel
     //               + STP outputs + restore Ds + POP FP/LR + RET)
     // + kernel    ((PUSH/POP X30 if has_op(CALL)) + body + RET)
-    if (rbb->regs <= max_jit_regs(rbb)) {
+    if (rbb->regs <= MAX_JIT_REGS) {
         int const save_pairs = callee_saved_pairs(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*save_pairs + rbb->in + rbb->out + 4);
         size_t       body       = 0;
@@ -481,7 +446,7 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
             case DIV:   d = reg[ip->x] / reg[ip->y]; break;
             case MIN:   d = __builtin_elementwise_min(reg[ip->x], reg[ip->y]); break;
             case MAX:   d = __builtin_elementwise_max(reg[ip->x], reg[ip->y]); break;
-            case FMA:   d = __builtin_elementwise_fma(reg[ip->x], reg[ip->y], reg[ip->z]); break;
+            case FMA:   d = __builtin_elementwise_fma(reg[ip->x], reg[ip->y], reg[ip->d]); break;
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
@@ -494,8 +459,8 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
             case OR:    d = (v8f)( (v8i)reg[ip->x] | (v8i)reg[ip->y] ); break;
             case XOR:   d = (v8f)( (v8i)reg[ip->x] ^ (v8i)reg[ip->y] ); break;
             case NOT:   d = (v8f)(~(v8i)reg[ip->x]); break;
-            case SEL:   d = (v8f)( ( (v8i)reg[ip->x] & (v8i)reg[ip->y])
-                                 | (~(v8i)reg[ip->x] & (v8i)reg[ip->z]) ); break;
+            case SEL:   d = (v8f)( ( (v8i)reg[ip->d] & (v8i)reg[ip->x])
+                                 | (~(v8i)reg[ip->d] & (v8i)reg[ip->y]) ); break;
 
             case CALL: rbb_eval(ip->call, reg + ip->d); continue;
         }
