@@ -24,14 +24,19 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     int max = -1;
     while (insts --> 0) {
-        max = inst->d > max ? inst->d : max;
-        for (short const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
-            max = *arg > max ? *arg : max;
+        if (inst->op == CALL) {
+            int const top = inst->d + inst->call->regs - 1;
+            max = top > max ? top : max;
+        } else {
+            max = inst->d > max ? inst->d : max;
+            for (short const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
+                max = *arg > max ? *arg : max;
+            }
         }
         rbb->inst[rbb->insts++] = *inst++;
     }
     int const regs = max+1;
-    rbb->regs = regs;  // TODO: add in max of regs from any CALLs
+    rbb->regs = regs;
 
     struct {
         _Bool input, written, output;
@@ -39,15 +44,30 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     for (int i = 0; i < rbb->insts; i++) {
         struct rbb_inst const *ip = rbb->inst + i;
-        for (short const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
-            if (!meta[*arg].written) {
-                meta[*arg].input = 1;
+        if (ip->op == CALL) {
+            for (int in = 0; in < ip->call->in; in++) {
+                int const r = ip->d + in;
+                if (!meta[r].written) {
+                    meta[r].input = 1;
+                }
+                meta[r].output = 0;
             }
-            meta[*arg].output = 0;
+            for (int out = 0; out < ip->call->out; out++) {
+                int const r = ip->d + out;
+                meta[r].written = 1;
+                meta[r].output  = 1;
+            }
+        } else {
+            for (short const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
+                if (!meta[*arg].written) {
+                    meta[*arg].input = 1;
+                }
+                meta[*arg].output = 0;
+            }
+            int d = ip->d;
+            meta[d].written = 1;
+            meta[d].output  = 1;
         }
-        int d = ip->d;
-        meta[d].written = 1;
-        meta[d].output  = 1;
     }
 
     for (int r = 0; r < regs; r++) {
@@ -109,7 +129,7 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
             case SEL:   d = (v8f)( ( (v8i)reg[ip->x] & (v8i)reg[ip->y])
                                  | (~(v8i)reg[ip->x] & (v8i)reg[ip->z]) ); break;
 
-            case CALL: break;  // TODO
+            case CALL: rbb_eval(ip->call, reg + ip->d); continue;
         }
         reg[ip->d] = d;
     }

@@ -211,6 +211,45 @@ static void test_SEL(void) {
     rbb_free(bb);
 }
 
+static void test_CALL(void) {
+    struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
+    struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
+
+    v8f reg[] = {21};
+    rbb_eval(caller, reg);
+    exact(reg[0].x, 42) here;
+
+    rbb_free(caller);
+    rbb_free(callee);
+}
+
+static void test_CALL_two_args(void) {
+    struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
+    struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
+
+    v8f reg[] = {10, 32};
+    rbb_eval(caller, reg);
+    exact(reg[0].x, 42) here;
+
+    rbb_free(caller);
+    rbb_free(callee);
+}
+
+static void test_CALL_then_op(void) {
+    struct rbb *doubler = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
+    struct rbb *caller  = rbb((struct rbb_inst[]){
+        {.op=CALL, .d=0, .call=doubler},
+        {.op=NEG,  .d=0, .x=0},
+    }, 2);
+
+    v8f reg[] = {21};
+    rbb_eval(caller, reg);
+    exact(reg[0].x, -42) here;
+
+    rbb_free(caller);
+    rbb_free(doubler);
+}
+
 static void check_meta(struct rbb const *bb, int inputs, int outputs, int registers) {
     struct rbb_meta const m = rbb_meta(bb);
     m.inputs    == inputs    here;
@@ -263,6 +302,14 @@ static void test_meta_write_read_rewrite(void) {
     rbb_free(bb);
 }
 
+static void test_meta_CALL(void) {
+    struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
+    struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
+    check_meta(caller, 2,1,2);
+    rbb_free(caller);
+    rbb_free(callee);
+}
+
 int main(void) {
     test_IMM();
     test_NEG();
@@ -288,6 +335,9 @@ int main(void) {
     test_XOR();
     test_NOT();
     test_SEL();
+    test_CALL();
+    test_CALL_two_args();
+    test_CALL_then_op();
 
     test_meta_empty();
     test_meta_no_inputs();
@@ -295,5 +345,6 @@ int main(void) {
     test_meta_in_place();
     test_meta_read_after_write();
     test_meta_write_read_rewrite();
+    test_meta_CALL();
     return 0;
 }
