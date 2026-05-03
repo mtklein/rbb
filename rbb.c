@@ -29,11 +29,18 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
         return (ip->d == ip->x || ip->d == ip->y || ip->d == ip->z) ? 8 : 16;
     }
     if (ip->op == CALL) {
-        // Per-CALL: SUB SP + saves + input MOVs + ADRP+ADD+BLR + output MOVs +
-        //          restores (skipping output chunks) + ADD SP.
-        // TODO: minimize traffic by not save/restoring chunks that become outputs.
+        // ADRP+ADD+BLR is always 12 bytes.  We additionally need:
+        //   - frame + saves + restores for caller's V[0..2*min(d,cregs)-1]
+        //     (the chunks above the call frame; in-frame chunks are either
+        //      callee inputs we're consuming or callee scratch we don't read back).
+        //   - input/output MOVs only when d>0; for d==0 they are identity MOVs.
         struct rbb const *callee = ip->call;
-        return (size_t)(20 + 8*callee->regs + 8*callee->in + 4*callee->out);
+        int const d = ip->d;
+        int const save_count = d < callee->regs ? d : callee->regs;
+        size_t bytes = 12;
+        if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
+        if (d          > 0) { bytes += (size_t)(8*(callee->in + callee->out)); }
+        return bytes;
     }
     static size_t const op_size[] = {
         [IMM]=20,
@@ -286,15 +293,18 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                 int const cin   = callee->in;
                 int const cout  = callee->out;
                 int const d     = ip->d;
+                int const save_count = d < cregs ? d : cregs;
 
-                // Save caller's V[0..2*cregs-1] to stack.  Each v8f = 32 bytes (Q+Q).
-                // TODO: minimize traffic by skipping chunks that will become outputs.
-                *out++ = enc_SUB_SP(32 * cregs);
-                for (int r = 0; r < cregs; r++) {
-                    *out++ = enc_STP_Q(2*r, 2*r+1, SP, 32*r);
+                // Save only the chunks above the call frame; chunks inside the
+                // frame are inputs we consume / outputs we'll overwrite / scratch.
+                if (save_count > 0) {
+                    *out++ = enc_SUB_SP(32 * save_count);
+                    for (int r = 0; r < save_count; r++) {
+                        *out++ = enc_STP_Q(2*r, 2*r+1, SP, 32*r);
+                    }
                 }
-                // Shift inputs into V[0..2*cin-1] (forward order is safe).
-                for (int j = 0; j < cin; j++) {
+                // Shift inputs into V[0..2*cin-1] (no-ops when d==0; skip emission).
+                for (int j = 0; j < cin && d > 0; j++) {
                     *out++ = enc_three_reg(enc_op[OR], 2*j,   2*(d+j),   2*(d+j));
                     *out++ = enc_three_reg(enc_op[OR], 2*j+1, 2*(d+j)+1, 2*(d+j)+1);
                 }
@@ -310,18 +320,17 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                     *out++ = enc_ADD_imm(X16, X16, imm12);
                     *out++ = enc_BLR    (X16);
                 }
-                // Shift outputs from V[0..2*cout-1] to V[2d..2(d+cout)-1] (reverse safe).
-                for (int j = cout; j --> 0;) {
+                // Shift outputs out (reverse order safe; no-ops when d==0).
+                for (int j = cout; j --> 0 && d > 0;) {
                     *out++ = enc_three_reg(enc_op[OR], 2*(d+j),   2*j,   2*j);
                     *out++ = enc_three_reg(enc_op[OR], 2*(d+j)+1, 2*j+1, 2*j+1);
                 }
-                // Restore caller V[0..2*cregs-1] EXCEPT the output range [d..d+cout).
-                for (int r = 0; r < cregs; r++) {
-                    if (r < d || r >= d+cout) {
+                if (save_count > 0) {
+                    for (int r = 0; r < save_count; r++) {
                         *out++ = enc_LDP_Q(2*r, 2*r+1, SP, 32*r);
                     }
+                    *out++ = enc_ADD_SP(32 * save_count);
                 }
-                *out++ = enc_ADD_SP(32 * cregs);
             } break;
         }
     }
