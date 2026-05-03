@@ -1,10 +1,15 @@
 #include "rbb.h"
+#include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
+#define MAX_JIT_REGS 16  // 32 NEON regs / 2 (v8f = 256 bits = 2 Q regs)
+
 struct rbb {
     int             insts,in,out,regs;
+    size_t          jit_size;
     struct rbb_inst inst[];
 };
 
@@ -16,6 +21,19 @@ static int const arity[] = {
     [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
     [CALL]  = 0,  // TODO
 };
+
+// Bytes emitted per op in the JIT.  0 means "not yet supported".
+static size_t const jit_op_size[] = {
+    [IMM]=0,
+    [NEG]=0, [ABS]=0, [SQRT]=0, [FLOOR]=0, [CEIL]=0, [TRUNC]=0, [ROUND]=0,
+    [ADD]=8, [SUB]=0, [MUL]=0, [DIV]=0, [MIN]=0, [MAX]=0, [FMA]=0,
+    [EQ]=0,  [NE]=0,  [LT]=0,  [LE]=0,
+    [AND]=0, [OR]=0,  [XOR]=0, [NOT]=0, [SEL]=0,
+    [CALL]=0,
+};
+static _Bool can_jit(enum rbb_op op) {
+    return jit_op_size[op] > 0;
+}
 
 struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     size_t const inst_size = (size_t)insts * sizeof *inst;
@@ -76,6 +94,20 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     }
 
     free(meta);
+
+    // jit_size: prologue (LDP per reg) + body (per-op) + epilogue (STP per reg) + RET
+    if (rbb->regs <= MAX_JIT_REGS) {
+        rbb->jit_size += (size_t)(8 * rbb->regs) + 4;
+        for (int i = 0; i < rbb->insts; i++) {
+            if (can_jit(rbb->inst[i].op)) {
+                rbb->jit_size += jit_op_size[rbb->inst[i].op];
+            } else {
+                rbb->jit_size = 0;
+                break;
+            }
+        }
+    }
+
     return rbb;
 }
 
@@ -88,6 +120,7 @@ struct rbb_meta rbb_meta(struct rbb const *bb) {
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
+        .jit_size  = bb->jit_size,
     };
 }
 
@@ -133,4 +166,74 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
         }
         reg[ip->d] = d;
     }
+}
+
+// AArch64 instruction encoders.  Rt/Rt2/Rn/Rd/Rm fit in 5 bits.
+//
+// LDP <Qt1>, <Qt2>, [<Xn>, #imm]   imm signed 7-bit, scaled by 16
+// STP same with bit 22 (L) cleared
+// FADD <Vd>.4S, <Vn>.4S, <Vm>.4S
+// RET (default Xn=x30) = 0xD65F03C0
+
+static uint32_t enc_LDP_Q(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset >> 4;
+    return 0xAD400000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+static uint32_t enc_STP_Q(int rt, int rt2, int rn, int offset) {
+    int const imm7 = offset >> 4;
+    return 0xAD000000u
+         | ((uint32_t)(imm7 & 0x7F) << 15)
+         | ((uint32_t)(rt2  & 0x1F) << 10)
+         | ((uint32_t)(rn   & 0x1F) <<  5)
+         | ((uint32_t)(rt   & 0x1F)      );
+}
+static uint32_t enc_FADD_4S(int rd, int rn, int rm) {
+    return 0x4E20D400u
+         | ((uint32_t)(rm & 0x1F) << 16)
+         | ((uint32_t)(rn & 0x1F) <<  5)
+         | ((uint32_t)(rd & 0x1F)      );
+}
+
+_Bool rbb_jit(struct rbb const *bb, void *buf) {
+    uint32_t *out = buf;
+    if (bb->jit_size) {
+        // Prologue: load each rbb register from x0[#offset] into a Q pair.
+        for (int r = 0; r < bb->regs; r++) {
+            *out++ = enc_LDP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+        }
+
+        for (int i = 0; i < bb->insts; i++) {
+            struct rbb_inst const *ip = bb->inst + i;
+            switch (ip->op) {
+                case ADD:
+                    *out++ = enc_FADD_4S(2*ip->d,   2*ip->x,   2*ip->y);
+                    *out++ = enc_FADD_4S(2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                    break;
+
+                case IMM:
+                case NEG: case ABS: case SQRT: case FLOOR:
+                case CEIL: case TRUNC: case ROUND:
+                case SUB: case MUL: case DIV: case MIN: case MAX: case FMA:
+                case EQ: case NE: case LT: case LE:
+                case AND: case OR: case XOR: case NOT: case SEL:
+                case CALL:
+                    return 0;
+            }
+        }
+
+        // Epilogue: store each rbb register back to x0[#offset], then return.
+        for (int r = 0; r < bb->regs; r++) {
+            *out++ = enc_STP_Q(2*r, 2*r+1, /*x0*/0, 32*r);
+        }
+        *out++ = 0xD65F03C0u;  // RET
+        return 1;
+    }
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size );
+    return 0;
+
+
 }

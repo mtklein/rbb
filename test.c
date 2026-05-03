@@ -1,6 +1,8 @@
 #include "rbb.h"
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
 
 #define here || (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap(), 0)
 
@@ -310,6 +312,32 @@ static void test_meta_CALL(void) {
     rbb_free(callee);
 }
 
+static void test_jit_ADD(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
+
+    struct rbb_meta const m = rbb_meta(bb);
+    m.jit_size > 0 here;
+
+    void *buf = mmap(NULL, m.jit_size, PROT_READ|PROT_WRITE,
+                     MAP_ANON|MAP_PRIVATE, -1, 0);
+    buf != MAP_FAILED here;
+
+    rbb_jit(bb, buf) here;
+
+    mprotect(buf, m.jit_size, PROT_READ|PROT_EXEC) == 0 here;
+    __builtin___clear_cache(buf, (char*)buf + m.jit_size);
+
+    void (*fn)(v8f*);
+    memcpy(&fn, &buf, sizeof fn);
+
+    v8f reg[] = {42, 47};
+    fn(reg);
+    exact(reg[0].x, 89) here;
+
+    munmap(buf, m.jit_size) == 0 here;
+    rbb_free(bb);
+}
+
 int main(void) {
     test_IMM();
     test_NEG();
@@ -346,5 +374,7 @@ int main(void) {
     test_meta_read_after_write();
     test_meta_write_read_rewrite();
     test_meta_CALL();
+
+    test_jit_ADD();
     return 0;
 }
