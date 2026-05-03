@@ -1,4 +1,5 @@
 #include "rbb.h"
+#include <stdint.h>
 #include <stdio.h>
 
 #define here || (dprintf(2, "%s:%d failed\n", __FILE__, __LINE__), __builtin_trap(), 0)

@@ -1,20 +1,62 @@
 #include "rbb.h"
 #include <stdlib.h>
-#include <string.h>
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
 struct rbb {
-    int             insts;
+    int             insts,in,out,regs;
     struct rbb_inst inst[];
+};
+
+static int const arity[] = {
+    [IMM]=0,
+    [NEG]=1, [ABS]=1, [SQRT]=1, [FLOOR]=1, [CEIL]=1, [TRUNC]=1, [ROUND]=1,
+    [ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MIN]=2, [MAX]=2, [FMA]=3,
+    [EQ]=2,  [NE]=2,  [LT]=2,  [LE]=2,
+    [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
+    [CALL]  = 0,  // TODO
 };
 
 struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     size_t const inst_size = (size_t)insts * sizeof *inst;
 
-    struct rbb *rbb = malloc(sizeof *rbb + inst_size);
-    rbb->insts = insts;
-    memcpy(rbb->inst, inst, inst_size);
+    struct rbb *rbb = calloc(1, sizeof *rbb + inst_size);
+
+    int max = 0;
+    while (insts --> 0) {
+        max = inst->d > max ? inst->d : max;
+        max = inst->x > max ? inst->x : max;
+        max = inst->y > max ? inst->y : max;
+        max = inst->z > max ? inst->z : max;
+
+        rbb->inst[rbb->insts++] = *inst++;
+    }
+    int const regs = max+1;
+    rbb->regs = regs;  // TODO: add in max of regs from any CALLs
+
+    struct {
+        _Bool input, written, output;
+    } *meta = calloc((size_t)regs, sizeof *meta);
+
+    for (int i = 0; i < rbb->insts; i++) {
+        struct rbb_inst const *ip = rbb->inst + i;
+        for (short const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
+            if (!meta[*arg].written) {
+                meta[*arg].input = 1;
+            }
+            meta[*arg].output = 0;
+        }
+        int d = ip->d;
+        meta[d].written = 1;
+        meta[d].output  = 1;
+    }
+
+    for (int r = 0; r < regs; r++) {
+        if (meta[r].input)  { rbb->in++; }
+        if (meta[r].output) { rbb->out++; }
+    }
+
+    free(meta);
     return rbb;
 }
 
@@ -59,6 +101,8 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
             case NOT:   d = (v8f)(~(v8i)reg[ip->x]); break;
             case SEL:   d = (v8f)( ( (v8i)reg[ip->x] & (v8i)reg[ip->y])
                                  | (~(v8i)reg[ip->x] & (v8i)reg[ip->z]) ); break;
+
+            case CALL: break;  // TODO
         }
         reg[ip->d] = d;
     }

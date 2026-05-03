@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-
 typedef float v8f __attribute__((ext_vector_type(8)));
 
 enum rbb_op {
@@ -10,15 +8,16 @@ enum rbb_op {
     ADD, SUB, MUL, DIV, MIN, MAX, FMA,
     EQ, NE, LT, LE,
     AND, OR, XOR, NOT, SEL,
+    CALL,
 };
 
+struct rbb;
+
 struct rbb_inst {
-    enum rbb_op op : 8;
-    uint8_t d, :8, :8;
-    union {
-        struct { uint8_t x,y,z; };
-        float imm;
-    };
+    enum rbb_op       op;
+    short             d,x,y,z;
+    float             imm;
+    struct rbb const *call;
 };
 
 struct rbb* rbb(struct rbb_inst const inst[], int insts);
