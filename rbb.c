@@ -39,7 +39,7 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
         return bytes;
     }
     static size_t const op_size[] = {
-        [IMM]=20,
+        [IMM]=16,
         [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
         [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=8,
         [EQ]=8,  [LT]=8,  [LE]=8,
@@ -97,10 +97,6 @@ static uint32_t enc_STP_Q(int rt, int rt2, int rn, int offset) {
          | ((uint32_t)(rn   & 0x1F) <<  5)
          | ((uint32_t)(rt   & 0x1F)      );
 }
-// DUP <Vd>.4S, <Vn>.S[0]   (broadcast lane 0 to all four lanes)
-static uint32_t enc_DUP_4S(int rd, int rn) {
-    return enc_two_reg(0x4E040400, rd,rn);
-}
 
 // STP <Dt1>, <Dt2>, [SP, #-16]!  pre-indexed (push pair, scaled by 8)
 static uint32_t enc_STP_D_pre(int rt, int rt2, int rn, int offset) {
@@ -149,6 +145,19 @@ static uint32_t enc_ADD_imm(int rd, int rn, int imm12) {
     return 0x91000000
          | ((uint32_t)(imm12 & 0xFFF) << 10)
          | ((uint32_t)(rn & 0x1F) << 5)
+         | ((uint32_t)(rd & 0x1F));
+}
+// MOV{Z,K} <Wd>, #imm16, LSL #(hw*16)   (32-bit immediate move)
+static uint32_t enc_MOVZ_W(int rd, uint32_t imm16, int hw) {
+    return 0x52800000
+         | ((uint32_t)(hw & 3) << 21)
+         | ((imm16 & 0xFFFF) << 5)
+         | ((uint32_t)(rd & 0x1F));
+}
+static uint32_t enc_MOVK_W(int rd, uint32_t imm16, int hw) {
+    return 0x72800000
+         | ((uint32_t)(hw & 3) << 21)
+         | ((imm16 & 0xFFFF) << 5)
          | ((uint32_t)(rd & 0x1F));
 }
 
@@ -238,11 +247,10 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
             case IMM: {
                 int const d0 = 2*ip->d, d1 = d0+1;
                 union { float f; uint32_t u; } v = { ip->imm };
-                *out++ = 0x14000002;
-                *out++ = v.u;
-                *out++ = 0x1CFFFFE0 | (uint32_t)d0;
-                *out++ = enc_DUP_4S(d0, d0);
-                *out++ = enc_DUP_4S(d1, d0);
+                *out++ = enc_MOVZ_W(X16,  v.u        & 0xFFFF, 0);
+                *out++ = enc_MOVK_W(X16, (v.u >> 16) & 0xFFFF, 1);
+                *out++ = enc_two_reg(0x4E040C00, d0, X16);  // DUP d0.4S, X16
+                *out++ = enc_three_reg(enc_op[OR],d1,d0,d0);
             } break;
 
             case CALL: {
