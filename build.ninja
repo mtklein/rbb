@@ -1,7 +1,7 @@
 builddir = out
 
-cc = clang -O1 -DNDEBUG
-cc = clang -g -fsanitize=address,integer,undefined -fno-sanitize-recover=all
+opt = clang -O1 -DNDEBUG
+dbg = clang -g -fsanitize=address,integer,undefined -fno-sanitize-recover=all
 
 warn = -Weverything $
        -Wno-declaration-after-statement $
@@ -20,7 +20,20 @@ rule link
 rule run
     command = ./$in > $out
 
-build out/rbb.o:   compile  rbb.c
-build out/test.o:  compile  test.c
-build out/test:    link out/test.o out/rbb.o
-build out/test.ok: run  out/test
+build out/dbg/rbb.o: compile rbb.c
+    cc = $dbg
+build out/opt/rbb.o: compile rbb.c
+    cc = $opt
+
+build out/dbg/test.o: compile test.c
+    cc = $dbg
+build out/opt/test.o: compile test.c
+    cc = $opt
+
+build out/dbg/test: link out/dbg/test.o out/dbg/rbb.o
+    cc = $dbg
+build out/opt/test: link out/opt/test.o out/opt/rbb.o
+    cc = $opt
+
+build out/dbg/test.ok: run out/dbg/test
+build out/opt/test.ok: run out/opt/test
