@@ -18,12 +18,11 @@ struct rbb {
     struct rbb_inst inst[];
 };
 
-static uint8_t const arity[] = {
-    [NEG]=1, [ABS]=1, [SQRT]=1, [FLOOR]=1, [CEIL]=1, [TRUNC]=1, [ROUND]=1,
-    [ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MIN]=2, [MAX]=2, [FMA]=3,
-    [EQ]=2,  [GT]=2,  [GE]=2,
-    [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
-};
+static int arity(enum rbb_op op) {
+    return op < NEG ? 0 :
+           op < ADD ? 1 :
+           op < FMA ? 2 : 3;
+}
 
 static size_t jit_inst_size_f8(struct rbb_inst const *ip) {
     if (ip->op == CALL) {
@@ -618,7 +617,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
             max = top > max ? top : max;
         } else {
             max = inst->d > max ? inst->d : max;
-            for (uint8_t const *arg = &inst->x, *end = arg+arity[inst->op]; arg != end; arg++) {
+            for (uint8_t const *arg = &inst->x, *end = arg+arity(inst->op); arg != end; arg++) {
                 max = *arg > max ? *arg : max;
             }
         }
@@ -647,7 +646,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
                 meta[r].output  = 1;
             }
         } else {
-            for (uint8_t const *arg = &ip->x, *end = arg+arity[ip->op]; arg != end; arg++) {
+            for (uint8_t const *arg = &ip->x, *end = arg+arity(ip->op); arg != end; arg++) {
                 if (!meta[*arg].written) {
                     meta[*arg].input = 1;
                 }

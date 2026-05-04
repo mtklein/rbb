@@ -9,12 +9,10 @@ typedef int      v8i __attribute__((ext_vector_type(8)));
 typedef short    v8s __attribute__((ext_vector_type(8)));
 
 enum rbb_op {
-    IMM,
-    NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND,
-    ADD, SUB, MUL, DIV, MIN, MAX, FMA,
-    EQ, GT, GE,
-    AND, OR, XOR, NOT, SEL,
-    CALL,
+    IMM, CALL,
+    NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND, NOT,
+    ADD, SUB, MUL, DIV, MIN, MAX, EQ, GT, GE, AND, OR, XOR,
+    FMA, SEL,
 };
 
 struct rbb;
