@@ -3,8 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// TODO: LT,LE -> GT,GE?
-
 typedef float    v8f __attribute__((ext_vector_type(8)));
 typedef _Float16 v8h __attribute__((ext_vector_type(8)));
 typedef int      v8i __attribute__((ext_vector_type(8)));
@@ -14,7 +12,7 @@ enum rbb_op {
     IMM,
     NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND,
     ADD, SUB, MUL, DIV, MIN, MAX, FMA,
-    EQ, LT, LE,
+    EQ, GT, GE,
     AND, OR, XOR, NOT, SEL,
     CALL,
 };

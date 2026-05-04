@@ -21,7 +21,7 @@ struct rbb {
 static uint8_t const arity[] = {
     [NEG]=1, [ABS]=1, [SQRT]=1, [FLOOR]=1, [CEIL]=1, [TRUNC]=1, [ROUND]=1,
     [ADD]=2, [SUB]=2, [MUL]=2, [DIV]=2, [MIN]=2, [MAX]=2, [FMA]=3,
-    [EQ]=2,  [LT]=2,  [LE]=2,
+    [EQ]=2,  [GT]=2,  [GE]=2,
     [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
 };
 
@@ -44,7 +44,7 @@ static size_t jit_inst_size_f8(struct rbb_inst const *ip) {
         [IMM]=16,
         [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
         [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=8,
-        [EQ]=8,  [LT]=8,  [LE]=8,
+        [EQ]=8,  [GT]=8,  [GE]=8,
         [AND]=8, [OR]=8,  [XOR]=8, [NOT]=8, [SEL]=8,
     };
     return op_size[ip->op];
@@ -64,7 +64,7 @@ static size_t jit_inst_size_h8(struct rbb_inst const *ip) {
         [IMM]=8,
         [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
         [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
-        [EQ]=4,  [LT]=4,  [LE]=4,
+        [EQ]=4,  [GT]=4,  [GE]=4,
         [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
     };
     return op_size[ip->op];
@@ -84,7 +84,7 @@ static size_t jit_inst_size_f4(struct rbb_inst const *ip) {
         [IMM]=12,
         [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
         [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
-        [EQ]=4,  [LT]=4,  [LE]=4,
+        [EQ]=4,  [GT]=4,  [GE]=4,
         [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
     };
     return op_size[ip->op];
@@ -109,8 +109,8 @@ static uint32_t const enc_op_f[] = {
     [XOR]   = 0x6E201C00,  // EOR  .16B
     [NOT]   = 0x6E205800,  // NOT  .16B (alias of MVN)
     [EQ]    = 0x4E20E400,  // FCMEQ .4S
-    [LE]    = 0x6E20E400,  // FCMGE .4S (use with operands swapped: x<=y == y>=x)
-    [LT]    = 0x6EA0E400,  // FCMGT .4S (use with operands swapped: x<y  == y>x)
+    [GE]    = 0x6E20E400,  // FCMGE .4S
+    [GT]    = 0x6EA0E400,  // FCMGT .4S
     [FMA]   = 0x4E20CC00,  // FMLA  .4S
 };
 static uint32_t const enc_op_h[] = {
@@ -132,8 +132,8 @@ static uint32_t const enc_op_h[] = {
     [XOR]   = 0x6E201C00,  // EOR  .16B
     [NOT]   = 0x6E205800,  // NOT  .16B
     [EQ]    = 0x4E402400,  // FCMEQ .8H
-    [LE]    = 0x6E402400,  // FCMGE .8H (swapped)
-    [LT]    = 0x6EC02400,  // FCMGT .8H (swapped)
+    [GE]    = 0x6E402400,  // FCMGE .8H
+    [GT]    = 0x6EC02400,  // FCMGT .8H
     [FMA]   = 0x4E400C00,  // FMLA  .8H
 };
 static uint32_t enc_three_reg(uint32_t base, int rd, int rn, int rm) {
@@ -302,14 +302,9 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf) {
         switch (ip->op) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
-            case EQ:
+            case EQ:  case GT:  case GE:
                 *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->x,   2*ip->y);
                 *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
-                break;
-
-            case LT: case LE:
-                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->y,   2*ip->x);
-                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->y+1, 2*ip->x+1);
                 break;
 
             case NEG: case ABS: case NOT:
@@ -435,12 +430,8 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf) {
         switch (ip->op) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
-            case EQ:
+            case EQ:  case GT:  case GE:
                 *out++ = enc_three_reg(enc_op_h[ip->op], ip->d, ip->x, ip->y);
-                break;
-
-            case LT: case LE:
-                *out++ = enc_three_reg(enc_op_h[ip->op], ip->d, ip->y, ip->x);
                 break;
 
             case NEG: case ABS: case NOT:
@@ -562,12 +553,8 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf) {
         switch (ip->op) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
-            case EQ:
+            case EQ:  case GT:  case GE:
                 *out++ = enc_three_reg(enc_op_f[ip->op], ip->d, ip->x, ip->y);
-                break;
-
-            case LT: case LE:
-                *out++ = enc_three_reg(enc_op_f[ip->op], ip->d, ip->y, ip->x);
                 break;
 
             case NEG: case ABS: case NOT:
@@ -858,8 +845,8 @@ void rbb_eval_f(struct rbb const *rbb, v8f reg[]) {
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
             case EQ:    d = (v8f)(reg[ip->x] == reg[ip->y]); break;
-            case LT:    d = (v8f)(reg[ip->x] <  reg[ip->y]); break;
-            case LE:    d = (v8f)(reg[ip->x] <= reg[ip->y]); break;
+            case GT:    d = (v8f)(reg[ip->x] >  reg[ip->y]); break;
+            case GE:    d = (v8f)(reg[ip->x] >= reg[ip->y]); break;
         #pragma GCC diagnostic pop
 
             case AND:   d = (v8f)( (v8i)reg[ip->x] & (v8i)reg[ip->y] ); break;
@@ -908,8 +895,8 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wfloat-equal"
             case EQ:    d = (v8h)(reg[ip->x] == reg[ip->y]); break;
-            case LT:    d = (v8h)(reg[ip->x] <  reg[ip->y]); break;
-            case LE:    d = (v8h)(reg[ip->x] <= reg[ip->y]); break;
+            case GT:    d = (v8h)(reg[ip->x] >  reg[ip->y]); break;
+            case GE:    d = (v8h)(reg[ip->x] >= reg[ip->y]); break;
         #pragma GCC diagnostic pop
 
             case AND:   d = (v8h)( (v8s)reg[ip->x] & (v8s)reg[ip->y] ); break;

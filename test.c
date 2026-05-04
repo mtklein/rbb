@@ -155,16 +155,16 @@ static void test_EQ(void) {
     rbb_free(bb);
 }
 
-static void test_LT(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=LT, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {3, 5};
+static void test_GT(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=GT, .d=0, .x=0, .y=1}, 1);
+    v8f reg[] = {5, 3};
     rbb_eval_f(bb, reg);
     exact_f(reg[0].x, Tf) here;
     rbb_free(bb);
 }
 
-static void test_LE(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=LE, .d=0, .x=0, .y=1}, 1);
+static void test_GE(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=GE, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {5, 5};
     rbb_eval_f(bb, reg);
     exact_f(reg[0].x, Tf) here;
@@ -446,16 +446,16 @@ static void test_EQ_h(void) {
     rbb_free(bb);
 }
 
-static void test_LT_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=LT, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {3, 5};
+static void test_GT_h(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=GT, .d=0, .x=0, .y=1}, 1);
+    v8h reg[] = {5, 3};
     rbb_eval_h(bb, reg);
     exact_h(reg[0][0], Th) here;
     rbb_free(bb);
 }
 
-static void test_LE_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=LE, .d=0, .x=0, .y=1}, 1);
+static void test_GE_h(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=GE, .d=0, .x=0, .y=1}, 1);
     v8h reg[] = {5, 5};
     rbb_eval_h(bb, reg);
     exact_h(reg[0][0], Th) here;
@@ -572,8 +572,8 @@ int main(void) {
     test_MAX();
     test_FMA();
     test_EQ();
-    test_LT();
-    test_LE();
+    test_GT();
+    test_GE();
     test_AND();
     test_OR();
     test_XOR();
@@ -607,8 +607,8 @@ int main(void) {
     test_MAX_h();
     test_FMA_h();
     test_EQ_h();
-    test_LT_h();
-    test_LE_h();
+    test_GT_h();
+    test_GE_h();
     test_AND_h();
     test_OR_h();
     test_XOR_h();
