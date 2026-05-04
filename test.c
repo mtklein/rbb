@@ -548,11 +548,10 @@ static void test_jit_h_supported(void) {
     rbb_free(bb);
 }
 
-static void test_jit_f_unsupported(void) {
-    // Programs that need more than MAX_JIT_REGS logical registers fall back to interp.
+static void test_jit_f_single_pump(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=20, .x=20, .y=20}, 1);
     struct rbb_meta meta = rbb_meta(bb);
-    !meta.jit_f here;
+    meta.jit_f here;
     rbb_free(bb);
 }
 
@@ -621,6 +620,6 @@ int main(void) {
 
     test_jit_f_supported();
     test_jit_h_supported();
-    test_jit_f_unsupported();
+    test_jit_f_single_pump();
     return 0;
 }

@@ -4,17 +4,17 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#define MAX_JIT_REGS_F 16  // 32 NEON regs / 2 (v8f = 256 bits = 2 Q regs)
-#define MAX_JIT_REGS_H 32  // 32 NEON regs / 1 (v8h = 128 bits = 1 Q reg)
-
 struct rbb {
     int             insts,in,out,regs;
-    void           *jit_trampoline_f;  // trampoline void (*)(v8f*) called from rbb_eval_f()
-    void           *jit_kernel_f;      // kernel entry BL'd from inner CALL ops
-    size_t          jit_size_f;        // total mmap'd size, trampoline + kernel
-    void           *jit_trampoline_h;
-    void           *jit_kernel_h;
-    size_t          jit_size_h;
+    void           *jit_trampoline_f8;
+    void           *jit_kernel_f8;
+    size_t          jit_size_f8;
+    void           *jit_trampoline_f4;
+    void           *jit_kernel_f4;
+    size_t          jit_size_f4;
+    void           *jit_trampoline_h8;
+    void           *jit_kernel_h8;
+    size_t          jit_size_h8;
     struct rbb_inst inst[];
 };
 
@@ -25,7 +25,7 @@ static uint8_t const arity[] = {
     [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
 };
 
-static size_t jit_inst_size_f(struct rbb_inst const *ip) {
+static size_t jit_inst_size_f8(struct rbb_inst const *ip) {
     if (ip->op == CALL) {
         // ADRP+ADD+BLR is always 12 bytes.  We additionally need:
         //   - frame + saves + restores for caller's V[0..2*min(d,cregs)-1]
@@ -50,7 +50,7 @@ static size_t jit_inst_size_f(struct rbb_inst const *ip) {
     return op_size[ip->op];
 }
 
-static size_t jit_inst_size_h(struct rbb_inst const *ip) {
+static size_t jit_inst_size_h8(struct rbb_inst const *ip) {
     if (ip->op == CALL) {
         struct rbb const *callee = ip->call;
         int const d = ip->d;
@@ -62,6 +62,26 @@ static size_t jit_inst_size_h(struct rbb_inst const *ip) {
     }
     static uint8_t const op_size[] = {
         [IMM]=8,
+        [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
+        [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
+        [EQ]=4,  [LT]=4,  [LE]=4,
+        [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
+    };
+    return op_size[ip->op];
+}
+
+static size_t jit_inst_size_f4(struct rbb_inst const *ip) {
+    if (ip->op == CALL) {
+        struct rbb const *callee = ip->call;
+        int const d = ip->d;
+        int const save_count = d < callee->regs ? d : callee->regs;
+        size_t bytes = 12;
+        if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
+        if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
+        return bytes;
+    }
+    static uint8_t const op_size[] = {
+        [IMM]=12,
         [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
         [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
         [EQ]=4,  [LT]=4,  [LE]=4,
@@ -222,12 +242,12 @@ static uint32_t enc_MOVK_W(int rd, uint32_t imm16, int hw) {
 }
 
 // Number of D-pairs we must save: V8..V15 lower 64 bits are callee-saved per AAPCS64.
-static int callee_saved_pairs_f(int regs) {
+static int callee_saves_f8(int regs) {
     return regs <= 4 ? 0 :
            regs <= 8 ? regs - 4 : 4;
 }
 
-static int callee_saves_h(int regs) {
+static int callee_saves_1q(int regs) {
     if (regs <= 8) { return 0; }
     int need = (regs < 16 ? regs : 16) - 8;
     return (need + 1) / 2;
@@ -243,12 +263,12 @@ static _Bool has_op(struct rbb const *bb, enum rbb_op op) {
 }
 
 // Returns the offset of the kernel within buf (= trampoline_size).
-static size_t emit_jit_f(struct rbb const *bb, void *buf) {
+static size_t emit_jit_f8(struct rbb const *bb, void *buf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
 
-    int const save_pairs = callee_saved_pairs_f(bb->regs);
+    int const save_pairs = callee_saves_f8(bb->regs);
     size_t const trampoline_size = 4 * (size_t)(2*save_pairs + bb->in + bb->out + 4);
 
     *out++ = ENC_PUSH_FP_LR;
@@ -343,7 +363,7 @@ static size_t emit_jit_f(struct rbb const *bb, void *buf) {
                 // Cross-buffer absolute call: ADRP+ADD+BLR via X16.
                 {
                     intptr_t const pc        = (intptr_t)out;
-                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_f;
+                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_f8;
                     intptr_t const adrp_page = pc  & ~(intptr_t)0xFFF;
                     intptr_t const tgt_page  = tgt & ~(intptr_t)0xFFF;
                     int const imm21 = (int)((tgt_page - adrp_page) >> 12);
@@ -372,16 +392,16 @@ static size_t emit_jit_f(struct rbb const *bb, void *buf) {
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f );
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f8 );
     return trampoline_size;
 }
 
-static size_t emit_jit_h(struct rbb const *bb, void *buf) {
+static size_t emit_jit_h8(struct rbb const *bb, void *buf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
 
-    int const saves = callee_saves_h(bb->regs);
+    int const saves = callee_saves_1q(bb->regs);
     size_t const trampoline_size = 4 * (size_t)(2*saves + bb->in + bb->out + 4);
 
     *out++ = ENC_PUSH_FP_LR;
@@ -461,7 +481,7 @@ static size_t emit_jit_h(struct rbb const *bb, void *buf) {
                 }
                 {
                     intptr_t const pc        = (intptr_t)out;
-                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_h;
+                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_h8;
                     intptr_t const adrp_page = pc  & ~(intptr_t)0xFFF;
                     intptr_t const tgt_page  = tgt & ~(intptr_t)0xFFF;
                     int const imm21 = (int)((tgt_page - adrp_page) >> 12);
@@ -488,7 +508,135 @@ static size_t emit_jit_h(struct rbb const *bb, void *buf) {
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_h );
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_h8 );
+    return trampoline_size;
+}
+
+static size_t emit_jit_f4(struct rbb const *bb, void *buf) {
+    enum { X0=0, SP=31, X16=16 };
+    uint32_t *const buf_words = buf;
+    uint32_t *out = buf_words;
+
+    int const saves = callee_saves_1q(bb->regs);
+    size_t const trampoline_size = 4 * (size_t)(2*saves + 2*bb->in + 2*bb->out + 5);
+
+    *out++ = ENC_PUSH_FP_LR;
+    for (int k = 0; k < saves; k++) {
+        *out++ = enc_STP_D_pre(2*k+8, 2*k+9, SP, -16);
+    }
+    for (int r = 0; r < bb->in; r++) {
+        *out++ = enc_LDR_Q(r, X0, 32*r);
+    }
+    {
+        ptrdiff_t const bl_word     = out - buf_words;
+        ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
+        *out++ = enc_BL((int)(target_word - bl_word));
+    }
+    for (int r = 0; r < bb->out; r++) {
+        *out++ = enc_STR_Q(r, X0, 32*r);
+    }
+    for (int r = 0; r < bb->in; r++) {
+        *out++ = enc_LDR_Q(r, X0, 32*r + 16);
+    }
+    {
+        ptrdiff_t const bl_word     = out - buf_words;
+        ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
+        *out++ = enc_BL((int)(target_word - bl_word));
+    }
+    for (int r = 0; r < bb->out; r++) {
+        *out++ = enc_STR_Q(r, X0, 32*r + 16);
+    }
+    for (int k = saves; k --> 0;) {
+        *out++ = enc_LDP_D_post(2*k+8, 2*k+9, SP, 16);
+    }
+    *out++ = ENC_POP_FP_LR;
+    *out++ = ENC_RET;
+    assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
+
+    _Bool const kernel_has_call = has_op(bb, CALL);
+    if (kernel_has_call) {
+        *out++ = ENC_PUSH_FP_LR;
+    }
+    for (int i = 0; i < bb->insts; i++) {
+        struct rbb_inst const *ip = bb->inst + i;
+        switch (ip->op) {
+            case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
+            case AND: case OR:  case XOR:
+            case EQ:
+                *out++ = enc_three_reg(enc_op_f[ip->op], ip->d, ip->x, ip->y);
+                break;
+
+            case LT: case LE:
+                *out++ = enc_three_reg(enc_op_f[ip->op], ip->d, ip->y, ip->x);
+                break;
+
+            case NEG: case ABS: case NOT:
+            case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
+                *out++ = enc_two_reg(enc_op_f[ip->op], ip->d, ip->x);
+                break;
+
+            case FMA:
+                *out++ = enc_three_reg(enc_op_f[FMA], ip->d, ip->x, ip->y);
+                break;
+
+            case SEL:
+                *out++ = enc_three_reg(0x6E601C00, ip->d, ip->x, ip->y);
+                break;
+
+            case IMM: {
+                union { float f; uint32_t u; } v = { ip->imm };
+                *out++ = enc_MOVZ_W(X16,  v.u        & 0xFFFF, 0);
+                *out++ = enc_MOVK_W(X16, (v.u >> 16) & 0xFFFF, 1);
+                *out++ = enc_two_reg(0x4E040C00, ip->d, X16);
+            } break;
+
+            case CALL: {
+                struct rbb const *callee = ip->call;
+                int const cregs = callee->regs;
+                int const cin   = callee->in;
+                int const cout  = callee->out;
+                int const d     = ip->d;
+                int const save_count = d < cregs ? d : cregs;
+
+                if (save_count > 0) {
+                    *out++ = enc_SUB_SP(16 * save_count);
+                    for (int r = 0; r < save_count; r++) {
+                        *out++ = enc_STR_Q(r, SP, 16*r);
+                    }
+                }
+                for (int j = 0; j < cin && d > 0; j++) {
+                    *out++ = enc_three_reg(enc_op_f[OR], j, d+j, d+j);
+                }
+                {
+                    intptr_t const pc        = (intptr_t)out;
+                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_f4;
+                    intptr_t const adrp_page = pc  & ~(intptr_t)0xFFF;
+                    intptr_t const tgt_page  = tgt & ~(intptr_t)0xFFF;
+                    int const imm21 = (int)((tgt_page - adrp_page) >> 12);
+                    int const imm12 = (int)(tgt & 0xFFFu);
+                    *out++ = enc_ADRP   (X16, imm21);
+                    *out++ = enc_ADD_imm(X16, X16, imm12);
+                    *out++ = enc_BLR    (X16);
+                }
+                for (int j = cout; j --> 0 && d > 0;) {
+                    *out++ = enc_three_reg(enc_op_f[OR], d+j, j, j);
+                }
+                if (save_count > 0) {
+                    for (int r = 0; r < save_count; r++) {
+                        *out++ = enc_LDR_Q(r, SP, 16*r);
+                    }
+                    *out++ = enc_ADD_SP(16 * save_count);
+                }
+            } break;
+        }
+    }
+
+    if (kernel_has_call) {
+        *out++ = ENC_POP_FP_LR;
+    }
+    *out++ = ENC_RET;
+
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f4 );
     return trampoline_size;
 }
 
@@ -552,72 +700,101 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     free(meta);
 
-    // jit_size_f:
-    //   trampoline (PUSH FP/LR + save Ds + LDP inputs + BL kernel
-    //               + STP outputs + restore Ds + POP FP/LR + RET)
-    // + kernel    ((PUSH/POP X30 if has_op(CALL)) + body + RET)
-    if (rbb->regs <= MAX_JIT_REGS_F) {
-        int const save_pairs = callee_saved_pairs_f(rbb->regs);
+    if (rbb->regs <= 16) {
+        int const save_pairs = callee_saves_f8(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*save_pairs + rbb->in + rbb->out + 4);
         size_t       body       = 0;
         size_t const x30_frame  = has_op(rbb, CALL) ? 8 : 0;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
-            if (ip->op == CALL && ip->call->jit_kernel_f == NULL) {
+            if (ip->op == CALL && ip->call->jit_kernel_f8 == NULL) {
                 body = 0;
                 break;
             }
-            body += jit_inst_size_f(ip);
+            body += jit_inst_size_f8(ip);
         }
         if (rbb->insts == 0 || body > 0) {
-            rbb->jit_size_f = trampoline + x30_frame + body + 4;  // +4 for kernel RET
+            rbb->jit_size_f8 = trampoline + x30_frame + body + 4;
         }
     }
 
-    if (rbb->jit_size_f > 0) {
-        void *buf = mmap(NULL, rbb->jit_size_f,
+    if (rbb->jit_size_f8 > 0) {
+        void *buf = mmap(NULL, rbb->jit_size_f8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit_f(rbb, buf);
-            if (0 == mprotect(buf, rbb->jit_size_f, PROT_READ|PROT_EXEC)) {
-                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f);
-                rbb->jit_trampoline_f = buf;
-                rbb->jit_kernel_f     = (char*)buf + kernel_offset;
+            size_t const kernel_offset = emit_jit_f8(rbb, buf);
+            if (0 == mprotect(buf, rbb->jit_size_f8, PROT_READ|PROT_EXEC)) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f8);
+                rbb->jit_trampoline_f8 = buf;
+                rbb->jit_kernel_f8     = (char*)buf + kernel_offset;
             } else {
-                munmap(buf, rbb->jit_size_f);
+                munmap(buf, rbb->jit_size_f8);
             }
         }
     }
 
-    if (rbb->regs <= MAX_JIT_REGS_H) {
-        int const saves = callee_saves_h(rbb->regs);
+    if (rbb->regs <= 32) {
+        int const saves = callee_saves_1q(rbb->regs);
+        size_t const trampoline = 4 * (size_t)(2*saves + 2*rbb->in + 2*rbb->out + 5);
+        size_t       body       = 0;
+        size_t const x30_frame  = has_op(rbb, CALL) ? 8 : 0;
+        for (int i = 0; i < rbb->insts; i++) {
+            struct rbb_inst const *ip = rbb->inst + i;
+            if (ip->op == CALL && ip->call->jit_kernel_f4 == NULL) {
+                body = 0;
+                break;
+            }
+            body += jit_inst_size_f4(ip);
+        }
+        if (rbb->insts == 0 || body > 0) {
+            rbb->jit_size_f4 = trampoline + x30_frame + body + 4;
+        }
+    }
+
+    if (rbb->jit_size_f4 > 0) {
+        void *buf = mmap(NULL, rbb->jit_size_f4,
+                         PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        if (buf != MAP_FAILED) {
+            size_t const kernel_offset = emit_jit_f4(rbb, buf);
+            if (0 == mprotect(buf, rbb->jit_size_f4, PROT_READ|PROT_EXEC)) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f4);
+                rbb->jit_trampoline_f4 = buf;
+                rbb->jit_kernel_f4     = (char*)buf + kernel_offset;
+            } else {
+                munmap(buf, rbb->jit_size_f4);
+            }
+        }
+    }
+
+    if (rbb->regs <= 32) {
+        int const saves = callee_saves_1q(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*saves + rbb->in + rbb->out + 4);
         size_t       body       = 0;
         size_t const x30_frame  = has_op(rbb, CALL) ? 8 : 0;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
-            if (ip->op == CALL && ip->call->jit_kernel_h == NULL) {
+            if (ip->op == CALL && ip->call->jit_kernel_h8 == NULL) {
                 body = 0;
                 break;
             }
-            body += jit_inst_size_h(ip);
+            body += jit_inst_size_h8(ip);
         }
         if (rbb->insts == 0 || body > 0) {
-            rbb->jit_size_h = trampoline + x30_frame + body + 4;
+            rbb->jit_size_h8 = trampoline + x30_frame + body + 4;
         }
     }
 
-    if (rbb->jit_size_h > 0) {
-        void *buf = mmap(NULL, rbb->jit_size_h,
+    if (rbb->jit_size_h8 > 0) {
+        void *buf = mmap(NULL, rbb->jit_size_h8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit_h(rbb, buf);
-            if (0 == mprotect(buf, rbb->jit_size_h, PROT_READ|PROT_EXEC)) {
-                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_h);
-                rbb->jit_trampoline_h = buf;
-                rbb->jit_kernel_h     = (char*)buf + kernel_offset;
+            size_t const kernel_offset = emit_jit_h8(rbb, buf);
+            if (0 == mprotect(buf, rbb->jit_size_h8, PROT_READ|PROT_EXEC)) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_h8);
+                rbb->jit_trampoline_h8 = buf;
+                rbb->jit_kernel_h8     = (char*)buf + kernel_offset;
             } else {
-                munmap(buf, rbb->jit_size_h);
+                munmap(buf, rbb->jit_size_h8);
             }
         }
     }
@@ -626,8 +803,9 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 }
 
 void rbb_free(struct rbb *bb) {
-    if (bb->jit_trampoline_f) { munmap(bb->jit_trampoline_f, bb->jit_size_f); }
-    if (bb->jit_trampoline_h) { munmap(bb->jit_trampoline_h, bb->jit_size_h); }
+    if (bb->jit_trampoline_f8) { munmap(bb->jit_trampoline_f8, bb->jit_size_f8); }
+    if (bb->jit_trampoline_f4) { munmap(bb->jit_trampoline_f4, bb->jit_size_f4); }
+    if (bb->jit_trampoline_h8) { munmap(bb->jit_trampoline_h8, bb->jit_size_h8); }
     free(bb);
 }
 
@@ -636,15 +814,21 @@ struct rbb_meta rbb_meta(struct rbb const *bb) {
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
-        .jit_f     = bb->jit_trampoline_f != NULL,
-        .jit_h     = bb->jit_trampoline_h != NULL,
+        .jit_f     = bb->jit_trampoline_f8 != NULL || bb->jit_trampoline_f4 != NULL,
+        .jit_h     = bb->jit_trampoline_h8 != NULL,
     };
 }
 
 void rbb_eval_f(struct rbb const *rbb, v8f reg[]) {
-    if (rbb->jit_trampoline_f) {
+    if (rbb->jit_trampoline_f8) {
         void (*fn)(v8f*);
-        memcpy(&fn, &rbb->jit_trampoline_f, sizeof fn);
+        memcpy(&fn, &rbb->jit_trampoline_f8, sizeof fn);
+        fn(reg);
+        return;
+    }
+    if (rbb->jit_trampoline_f4) {
+        void (*fn)(v8f*);
+        memcpy(&fn, &rbb->jit_trampoline_f4, sizeof fn);
         fn(reg);
         return;
     }
@@ -692,9 +876,9 @@ void rbb_eval_f(struct rbb const *rbb, v8f reg[]) {
 }
 
 void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
-    if (rbb->jit_trampoline_h) {
+    if (rbb->jit_trampoline_h8) {
         void (*fn)(v8h*);
-        memcpy(&fn, &rbb->jit_trampoline_h, sizeof fn);
+        memcpy(&fn, &rbb->jit_trampoline_h8, sizeof fn);
         fn(reg);
         return;
     }
