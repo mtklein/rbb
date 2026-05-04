@@ -34,5 +34,5 @@ struct rbb_meta {
 
 struct rbb*     rbb(struct rbb_inst const inst[], int insts);
 struct rbb_meta rbb_meta(struct rbb const*);
-void            rbb_eval(struct rbb const*, v8f reg[]);
+void            rbb_evalf(struct rbb const*, v8f reg[]);
 void            rbb_free(struct rbb*);

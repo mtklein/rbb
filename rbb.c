@@ -6,13 +6,13 @@
 
 typedef int v8i __attribute__((ext_vector_type(8)));
 
-#define MAX_JIT_REGS 16  // 32 NEON regs / 2 (v8f = 256 bits = 2 Q regs)
+#define MAX_JIT_REGS_F 16  // 32 NEON regs / 2 (v8f = 256 bits = 2 Q regs)
 
 struct rbb {
     int             insts,in,out,regs;
-    void           *jit_trampoline;  // trampoline void (*)(v8f*) called from rbb_eval()
-    void           *jit_kernel;      // kernel entry BL'd from inner CALL ops
-    size_t          jit_size;        // total mmap'd size, trampoline + kernel
+    void           *jit_trampoline_f;  // trampoline void (*)(v8f*) called from rbb_evalf()
+    void           *jit_kernel_f;      // kernel entry BL'd from inner CALL ops
+    size_t          jit_size_f;        // total mmap'd size, trampoline + kernel
     struct rbb_inst inst[];
 };
 
@@ -23,7 +23,7 @@ static uint8_t const arity[] = {
     [AND]=2, [OR]=2,  [XOR]=2, [NOT]=1, [SEL]=3,
 };
 
-static size_t jit_inst_size(struct rbb_inst const *ip) {
+static size_t jit_inst_size_f(struct rbb_inst const *ip) {
     if (ip->op == CALL) {
         // ADRP+ADD+BLR is always 12 bytes.  We additionally need:
         //   - frame + saves + restores for caller's V[0..2*min(d,cregs)-1]
@@ -48,7 +48,7 @@ static size_t jit_inst_size(struct rbb_inst const *ip) {
     return op_size[ip->op];
 }
 
-static uint32_t const enc_op[] = {
+static uint32_t const enc_op_f[] = {
     [ADD]   = 0x4E20D400,  // FADD .4S
     [SUB]   = 0x4EA0D400,  // FSUB .4S
     [MUL]   = 0x6E20DC00,  // FMUL .4S
@@ -162,7 +162,7 @@ static uint32_t enc_MOVK_W(int rd, uint32_t imm16, int hw) {
 }
 
 // Number of D-pairs we must save: V8..V15 lower 64 bits are callee-saved per AAPCS64.
-static int callee_saved_pairs(int regs) {
+static int callee_saved_pairs_f(int regs) {
     return regs <= 4 ? 0 :
            regs <= 8 ? regs - 4 : 4;
 }
@@ -177,12 +177,12 @@ static _Bool has_op(struct rbb const *bb, enum rbb_op op) {
 }
 
 // Returns the offset of the kernel within buf (= trampoline_size).
-static size_t emit_jit(struct rbb const *bb, void *buf) {
+static size_t emit_jit_f(struct rbb const *bb, void *buf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
 
-    int const save_pairs = callee_saved_pairs(bb->regs);
+    int const save_pairs = callee_saved_pairs_f(bb->regs);
     size_t const trampoline_size = 4 * (size_t)(2*save_pairs + bb->in + bb->out + 4);
 
     *out++ = ENC_PUSH_FP_LR;
@@ -217,25 +217,25 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
             case EQ:
-                *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d,   2*ip->x,   2*ip->y);
-                *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->x,   2*ip->y);
+                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
                 break;
 
             case LT: case LE:
-                *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d,   2*ip->y,   2*ip->x);
-                *out++ = enc_three_reg(enc_op[ip->op], 2*ip->d+1, 2*ip->y+1, 2*ip->x+1);
+                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->y,   2*ip->x);
+                *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->y+1, 2*ip->x+1);
                 break;
 
             case NEG: case ABS: case NOT:
             case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
-                *out++ = enc_two_reg(enc_op[ip->op], 2*ip->d,   2*ip->x);
-                *out++ = enc_two_reg(enc_op[ip->op], 2*ip->d+1, 2*ip->x+1);
+                *out++ = enc_two_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->x);
+                *out++ = enc_two_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->x+1);
                 break;
 
             case FMA:
                 // FMLA Vd, Vx, Vy : Vd += Vx * Vy.
-                *out++ = enc_three_reg(enc_op[FMA], 2*ip->d,   2*ip->x,   2*ip->y);
-                *out++ = enc_three_reg(enc_op[FMA], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
+                *out++ = enc_three_reg(enc_op_f[FMA], 2*ip->d,   2*ip->x,   2*ip->y);
+                *out++ = enc_three_reg(enc_op_f[FMA], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
                 break;
 
             case SEL:
@@ -250,7 +250,7 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                 *out++ = enc_MOVZ_W(X16,  v.u        & 0xFFFF, 0);
                 *out++ = enc_MOVK_W(X16, (v.u >> 16) & 0xFFFF, 1);
                 *out++ = enc_two_reg(0x4E040C00, d0, X16);  // DUP d0.4S, X16
-                *out++ = enc_three_reg(enc_op[OR],d1,d0,d0);
+                *out++ = enc_three_reg(enc_op_f[OR],d1,d0,d0);
             } break;
 
             case CALL: {
@@ -271,13 +271,13 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                 }
                 // Shift inputs into V[0..2*cin-1] (no-ops when d==0; skip emission).
                 for (int j = 0; j < cin && d > 0; j++) {
-                    *out++ = enc_three_reg(enc_op[OR], 2*j,   2*(d+j),   2*(d+j));
-                    *out++ = enc_three_reg(enc_op[OR], 2*j+1, 2*(d+j)+1, 2*(d+j)+1);
+                    *out++ = enc_three_reg(enc_op_f[OR], 2*j,   2*(d+j),   2*(d+j));
+                    *out++ = enc_three_reg(enc_op_f[OR], 2*j+1, 2*(d+j)+1, 2*(d+j)+1);
                 }
                 // Cross-buffer absolute call: ADRP+ADD+BLR via X16.
                 {
                     intptr_t const pc        = (intptr_t)out;
-                    intptr_t const tgt       = (intptr_t)callee->jit_kernel;
+                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_f;
                     intptr_t const adrp_page = pc  & ~(intptr_t)0xFFF;
                     intptr_t const tgt_page  = tgt & ~(intptr_t)0xFFF;
                     int const imm21 = (int)((tgt_page - adrp_page) >> 12);
@@ -288,8 +288,8 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
                 }
                 // Shift outputs out (reverse order safe; no-ops when d==0).
                 for (int j = cout; j --> 0 && d > 0;) {
-                    *out++ = enc_three_reg(enc_op[OR], 2*(d+j),   2*j,   2*j);
-                    *out++ = enc_three_reg(enc_op[OR], 2*(d+j)+1, 2*j+1, 2*j+1);
+                    *out++ = enc_three_reg(enc_op_f[OR], 2*(d+j),   2*j,   2*j);
+                    *out++ = enc_three_reg(enc_op_f[OR], 2*(d+j)+1, 2*j+1, 2*j+1);
                 }
                 if (save_count > 0) {
                     for (int r = 0; r < save_count; r++) {
@@ -306,7 +306,7 @@ static size_t emit_jit(struct rbb const *bb, void *buf) {
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size );
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f );
     return trampoline_size;
 }
 
@@ -370,39 +370,39 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     free(meta);
 
-    // jit_size:
+    // jit_size_f:
     //   trampoline (PUSH FP/LR + save Ds + LDP inputs + BL kernel
     //               + STP outputs + restore Ds + POP FP/LR + RET)
     // + kernel    ((PUSH/POP X30 if has_op(CALL)) + body + RET)
-    if (rbb->regs <= MAX_JIT_REGS) {
-        int const save_pairs = callee_saved_pairs(rbb->regs);
+    if (rbb->regs <= MAX_JIT_REGS_F) {
+        int const save_pairs = callee_saved_pairs_f(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*save_pairs + rbb->in + rbb->out + 4);
         size_t       body       = 0;
         size_t const x30_frame  = has_op(rbb, CALL) ? 8 : 0;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
-            if (ip->op == CALL && ip->call->jit_kernel == NULL) {
+            if (ip->op == CALL && ip->call->jit_kernel_f == NULL) {
                 body = 0;
                 break;
             }
-            body += jit_inst_size(ip);
+            body += jit_inst_size_f(ip);
         }
         if (rbb->insts == 0 || body > 0) {
-            rbb->jit_size = trampoline + x30_frame + body + 4;  // +4 for kernel RET
+            rbb->jit_size_f = trampoline + x30_frame + body + 4;  // +4 for kernel RET
         }
     }
 
-    if (rbb->jit_size > 0) {
-        void *buf = mmap(NULL, rbb->jit_size,
+    if (rbb->jit_size_f > 0) {
+        void *buf = mmap(NULL, rbb->jit_size_f,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit(rbb, buf);
-            if (0 == mprotect(buf, rbb->jit_size, PROT_READ|PROT_EXEC)) {
-                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size);
-                rbb->jit_trampoline = buf;
-                rbb->jit_kernel     = (char*)buf + kernel_offset;
+            size_t const kernel_offset = emit_jit_f(rbb, buf);
+            if (0 == mprotect(buf, rbb->jit_size_f, PROT_READ|PROT_EXEC)) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f);
+                rbb->jit_trampoline_f = buf;
+                rbb->jit_kernel_f     = (char*)buf + kernel_offset;
             } else {
-                munmap(buf, rbb->jit_size);
+                munmap(buf, rbb->jit_size_f);
             }
         }
     }
@@ -411,8 +411,8 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 }
 
 void rbb_free(struct rbb *bb) {
-    if (bb->jit_trampoline) {
-        munmap(bb->jit_trampoline, bb->jit_size);
+    if (bb->jit_trampoline_f) {
+        munmap(bb->jit_trampoline_f, bb->jit_size_f);
     }
     free(bb);
 }
@@ -422,14 +422,14 @@ struct rbb_meta rbb_meta(struct rbb const *bb) {
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
-        .jit       = bb->jit_trampoline != NULL,
+        .jit       = bb->jit_trampoline_f != NULL,
     };
 }
 
-void rbb_eval(struct rbb const *rbb, v8f reg[]) {
-    if (rbb->jit_trampoline) {
+void rbb_evalf(struct rbb const *rbb, v8f reg[]) {
+    if (rbb->jit_trampoline_f) {
         void (*fn)(v8f*);
-        memcpy(&fn, &rbb->jit_trampoline, sizeof fn);
+        memcpy(&fn, &rbb->jit_trampoline_f, sizeof fn);
         fn(reg);
         return;
     }
@@ -470,7 +470,7 @@ void rbb_eval(struct rbb const *rbb, v8f reg[]) {
             case SEL:   d = (v8f)( ( (v8i)reg[ip->d] & (v8i)reg[ip->x])
                                  | (~(v8i)reg[ip->d] & (v8i)reg[ip->y]) ); break;
 
-            case CALL: rbb_eval(ip->call, reg + ip->d); continue;
+            case CALL: rbb_evalf(ip->call, reg + ip->d); continue;
         }
         reg[ip->d] = d;
     }

@@ -18,7 +18,7 @@ static _Bool exact(float x, float y) {
 static void test_IMM(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=3.14f}, 1);
     v8f reg[] = {0};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 3.14f) here;
     rbb_free(bb);
 }
@@ -26,7 +26,7 @@ static void test_IMM(void) {
 static void test_NEG(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
     v8f reg[] = {42};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, -42) here;
     rbb_free(bb);
 }
@@ -34,7 +34,7 @@ static void test_NEG(void) {
 static void test_ABS(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ABS, .d=0, .x=0}, 1);
     v8f reg[] = {-42};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 42) here;
     rbb_free(bb);
 }
@@ -42,7 +42,7 @@ static void test_ABS(void) {
 static void test_SQRT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SQRT, .d=0, .x=0}, 1);
     v8f reg[] = {49};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 7) here;
     rbb_free(bb);
 }
@@ -50,7 +50,7 @@ static void test_SQRT(void) {
 static void test_FLOOR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=FLOOR, .d=0, .x=0}, 1);
     v8f reg[] = {1.7f};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 1) here;
     rbb_free(bb);
 }
@@ -58,7 +58,7 @@ static void test_FLOOR(void) {
 static void test_CEIL(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=CEIL, .d=0, .x=0}, 1);
     v8f reg[] = {1.3f};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 2) here;
     rbb_free(bb);
 }
@@ -66,7 +66,7 @@ static void test_CEIL(void) {
 static void test_TRUNC(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=TRUNC, .d=0, .x=0}, 1);
     v8f reg[] = {-1.7f};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, -1) here;
     rbb_free(bb);
 }
@@ -74,7 +74,7 @@ static void test_TRUNC(void) {
 static void test_ROUND(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ROUND, .d=0, .x=0}, 1);
     v8f reg[] = {1.5f};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 2) here;
     rbb_free(bb);
 }
@@ -83,7 +83,7 @@ static void test_ADD(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
 
     v8f reg[] = {42, 47};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
 
     exact(reg[0].x, 89) here;
     exact(reg[1].y, 47) here;
@@ -94,7 +94,7 @@ static void test_ADD(void) {
 static void test_SUB(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SUB, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {47, 42};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 5) here;
     rbb_free(bb);
 }
@@ -102,7 +102,7 @@ static void test_SUB(void) {
 static void test_MUL(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MUL, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {6, 7};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 42) here;
     rbb_free(bb);
 }
@@ -110,7 +110,7 @@ static void test_MUL(void) {
 static void test_DIV(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=DIV, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {84, 2};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 42) here;
     rbb_free(bb);
 }
@@ -118,7 +118,7 @@ static void test_DIV(void) {
 static void test_MIN(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MIN, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {3, 5};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 3) here;
     rbb_free(bb);
 }
@@ -126,7 +126,7 @@ static void test_MIN(void) {
 static void test_MAX(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MAX, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {3, 5};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 5) here;
     rbb_free(bb);
 }
@@ -135,7 +135,7 @@ static void test_FMA(void) {
     // FMA d += x*y :  reg[0] = reg[0] + reg[1] * reg[2] = 4 + 2*3 = 10.
     struct rbb *bb = rbb(&(struct rbb_inst){.op=FMA, .d=0, .x=1, .y=2}, 1);
     v8f reg[] = {4, 2, 3};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 10) here;
     rbb_free(bb);
 }
@@ -143,7 +143,7 @@ static void test_FMA(void) {
 static void test_EQ(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=EQ, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {42, 42};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, T) here;
     rbb_free(bb);
 }
@@ -151,7 +151,7 @@ static void test_EQ(void) {
 static void test_LT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=LT, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {3, 5};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, T) here;
     rbb_free(bb);
 }
@@ -159,7 +159,7 @@ static void test_LT(void) {
 static void test_LE(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=LE, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {5, 5};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, T) here;
     rbb_free(bb);
 }
@@ -167,7 +167,7 @@ static void test_LE(void) {
 static void test_AND(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=AND, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {T, 0};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 0) here;
     rbb_free(bb);
 }
@@ -175,7 +175,7 @@ static void test_AND(void) {
 static void test_OR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=OR, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {T, 0};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, T) here;
     rbb_free(bb);
 }
@@ -183,7 +183,7 @@ static void test_OR(void) {
 static void test_XOR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=XOR, .d=0, .x=0, .y=1}, 1);
     v8f reg[] = {T, T};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 0) here;
     rbb_free(bb);
 }
@@ -191,7 +191,7 @@ static void test_XOR(void) {
 static void test_NOT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=NOT, .d=0, .x=0}, 1);
     v8f reg[] = {0};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, T) here;
     rbb_free(bb);
 }
@@ -200,7 +200,7 @@ static void test_SEL(void) {
     // SEL d = d ? x : y :  reg[0] = reg[0] ? reg[1] : reg[2] = T ? 1 : 2 = 1.
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SEL, .d=0, .x=1, .y=2}, 1);
     v8f reg[] = {T, 1, 2};
-    rbb_eval(bb, reg);
+    rbb_evalf(bb, reg);
     exact(reg[0].x, 1) here;
     rbb_free(bb);
 }
@@ -210,7 +210,7 @@ static void test_CALL(void) {
     struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
 
     v8f reg[] = {21};
-    rbb_eval(caller, reg);
+    rbb_evalf(caller, reg);
     exact(reg[0].x, 42) here;
 
     rbb_free(caller);
@@ -222,7 +222,7 @@ static void test_CALL_two_args(void) {
     struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
 
     v8f reg[] = {10, 32};
-    rbb_eval(caller, reg);
+    rbb_evalf(caller, reg);
     exact(reg[0].x, 42) here;
 
     rbb_free(caller);
@@ -237,7 +237,7 @@ static void test_CALL_then_op(void) {
     }, 2);
 
     v8f reg[] = {21};
-    rbb_eval(caller, reg);
+    rbb_evalf(caller, reg);
     exact(reg[0].x, -42) here;
 
     rbb_free(caller);
