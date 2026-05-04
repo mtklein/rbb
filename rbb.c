@@ -40,14 +40,7 @@ static size_t jit_inst_size_f8(struct rbb_inst const *ip) {
         if (d          > 0) { bytes += (size_t)(8*(callee->in + callee->out)); }
         return bytes;
     }
-    static uint8_t const op_size[] = {
-        [IMM]=16,
-        [NEG]=8, [ABS]=8, [SQRT]=8, [FLOOR]=8, [CEIL]=8, [TRUNC]=8, [ROUND]=8,
-        [ADD]=8, [SUB]=8, [MUL]=8, [DIV]=8, [MIN]=8, [MAX]=8, [FMA]=8,
-        [EQ]=8,  [GT]=8,  [GE]=8,
-        [AND]=8, [OR]=8,  [XOR]=8, [NOT]=8, [SEL]=8,
-    };
-    return op_size[ip->op];
+    return ip->op == IMM ? 16 : 8;
 }
 
 static size_t jit_inst_size_h8(struct rbb_inst const *ip) {
@@ -60,14 +53,7 @@ static size_t jit_inst_size_h8(struct rbb_inst const *ip) {
         if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
         return bytes;
     }
-    static uint8_t const op_size[] = {
-        [IMM]=8,
-        [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
-        [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
-        [EQ]=4,  [GT]=4,  [GE]=4,
-        [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
-    };
-    return op_size[ip->op];
+    return ip->op == IMM ? 8 : 4;
 }
 
 static size_t jit_inst_size_f4(struct rbb_inst const *ip) {
@@ -80,14 +66,7 @@ static size_t jit_inst_size_f4(struct rbb_inst const *ip) {
         if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
         return bytes;
     }
-    static uint8_t const op_size[] = {
-        [IMM]=12,
-        [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
-        [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
-        [EQ]=4,  [GT]=4,  [GE]=4,
-        [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
-    };
-    return op_size[ip->op];
+    return ip->op == IMM ? 12 : 4;
 }
 
 static uint32_t const enc_op_f[] = {
