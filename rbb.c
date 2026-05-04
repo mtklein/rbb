@@ -649,7 +649,6 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
             rbb->jit_size_f8 = trampoline + x30_frame + body + 4;
         }
     }
-
     if (rbb->jit_size_f8 > 0) {
         void *buf = mmap(NULL, rbb->jit_size_f8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
@@ -682,7 +681,6 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
             rbb->jit_size_f4 = trampoline + x30_frame + body + 4;
         }
     }
-
     if (rbb->jit_size_f4 > 0) {
         void *buf = mmap(NULL, rbb->jit_size_f4,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
@@ -715,7 +713,6 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
             rbb->jit_size_h8 = trampoline + x30_frame + body + 4;
         }
     }
-
     if (rbb->jit_size_h8 > 0) {
         void *buf = mmap(NULL, rbb->jit_size_h8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
