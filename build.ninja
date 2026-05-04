@@ -1,6 +1,6 @@
 builddir = out
 
-cc = clang -O1
+cc = clang -O1 -DNDEBUG
 cc = clang -g -fsanitize=address,integer,undefined -fno-sanitize-recover=all
 
 warn = -Weverything $
