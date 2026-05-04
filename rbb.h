@@ -15,8 +15,6 @@ enum rbb_op {
     FMA, SEL,
 };
 
-struct rbb;
-
 struct rbb_inst {
     enum rbb_op       op :8;
     uint8_t           x,y,d;
