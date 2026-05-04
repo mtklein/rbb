@@ -90,6 +90,7 @@ static uint32_t const enc_op_f[] = {
     [GE]    = 0x6E20E400,  // FCMGE .4S
     [GT]    = 0x6EA0E400,  // FCMGT .4S
     [FMA]   = 0x4E20CC00,  // FMLA  .4S
+    [SEL]   = 0x6E601C00,  // BSL   .16B
 };
 static uint32_t const enc_op_h[] = {
     [ADD]   = 0x4E401400,  // FADD   .8H
@@ -113,6 +114,7 @@ static uint32_t const enc_op_h[] = {
     [GE]    = 0x6E402400,  // FCMGE .8H
     [GT]    = 0x6EC02400,  // FCMGT .8H
     [FMA]   = 0x4E400C00,  // FMLA  .8H
+    [SEL]   = 0x6E601C00,  // BSL   .16B
 };
 static uint32_t enc_three_reg(uint32_t base, int rd, int rn, int rm) {
     return base
@@ -281,6 +283,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
             case EQ:  case GT:  case GE:
+            case FMA: case SEL:
                 *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->x,   2*ip->y);
                 *out++ = enc_three_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
                 break;
@@ -289,18 +292,6 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf) {
             case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
                 *out++ = enc_two_reg(enc_op_f[ip->op], 2*ip->d,   2*ip->x);
                 *out++ = enc_two_reg(enc_op_f[ip->op], 2*ip->d+1, 2*ip->x+1);
-                break;
-
-            case FMA:
-                // FMLA Vd, Vx, Vy : Vd += Vx * Vy.
-                *out++ = enc_three_reg(enc_op_f[FMA], 2*ip->d,   2*ip->x,   2*ip->y);
-                *out++ = enc_three_reg(enc_op_f[FMA], 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
-                break;
-
-            case SEL:
-                // BSL Vd, Vx, Vy : Vd = (Vd & Vx) | (~Vd & Vy)  (mask = Vd).
-                *out++ = enc_three_reg(0x6E601C00, 2*ip->d,   2*ip->x,   2*ip->y);
-                *out++ = enc_three_reg(0x6E601C00, 2*ip->d+1, 2*ip->x+1, 2*ip->y+1);
                 break;
 
             case IMM: {
@@ -409,20 +400,13 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
             case EQ:  case GT:  case GE:
+            case FMA: case SEL:
                 *out++ = enc_three_reg(enc_op_h[ip->op], ip->d, ip->x, ip->y);
                 break;
 
             case NEG: case ABS: case NOT:
             case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
                 *out++ = enc_two_reg(enc_op_h[ip->op], ip->d, ip->x);
-                break;
-
-            case FMA:
-                *out++ = enc_three_reg(enc_op_h[FMA], ip->d, ip->x, ip->y);
-                break;
-
-            case SEL:
-                *out++ = enc_three_reg(0x6E601C00, ip->d, ip->x, ip->y);
                 break;
 
             case IMM: {
@@ -532,20 +516,13 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf) {
             case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
             case AND: case OR:  case XOR:
             case EQ:  case GT:  case GE:
+            case FMA: case SEL:
                 *out++ = enc_three_reg(enc_op_f[ip->op], ip->d, ip->x, ip->y);
                 break;
 
             case NEG: case ABS: case NOT:
             case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
                 *out++ = enc_two_reg(enc_op_f[ip->op], ip->d, ip->x);
-                break;
-
-            case FMA:
-                *out++ = enc_three_reg(enc_op_f[FMA], ip->d, ip->x, ip->y);
-                break;
-
-            case SEL:
-                *out++ = enc_three_reg(0x6E601C00, ip->d, ip->x, ip->y);
                 break;
 
             case IMM: {
