@@ -1,5 +1,4 @@
 #include "rbb.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -262,7 +261,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_POP_FP_LR;
     *out++ = ENC_RET;
-    assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
     if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
@@ -346,7 +345,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f8 );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f8 );
     return trampoline_size;
 }
 
@@ -378,7 +377,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_POP_FP_LR;
     *out++ = ENC_RET;
-    assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
     if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
@@ -450,7 +449,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_h8 );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_h8 );
     return trampoline_size;
 }
 
@@ -493,7 +492,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_POP_FP_LR;
     *out++ = ENC_RET;
-    assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
     if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
@@ -566,7 +565,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
     }
     *out++ = ENC_RET;
 
-    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f4 );
+    __builtin_assume( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_f4 );
     return trampoline_size;
 }
 
