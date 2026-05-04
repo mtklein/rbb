@@ -4,15 +4,17 @@
 #include <string.h>
 #include <sys/mman.h>
 
-typedef int v8i __attribute__((ext_vector_type(8)));
-
 #define MAX_JIT_REGS_F 16  // 32 NEON regs / 2 (v8f = 256 bits = 2 Q regs)
+#define MAX_JIT_REGS_H 32  // 32 NEON regs / 1 (v8h = 128 bits = 1 Q reg)
 
 struct rbb {
     int             insts,in,out,regs;
-    void           *jit_trampoline_f;  // trampoline void (*)(v8f*) called from rbb_evalf()
+    void           *jit_trampoline_f;  // trampoline void (*)(v8f*) called from rbb_eval_f()
     void           *jit_kernel_f;      // kernel entry BL'd from inner CALL ops
     size_t          jit_size_f;        // total mmap'd size, trampoline + kernel
+    void           *jit_trampoline_h;
+    void           *jit_kernel_h;
+    size_t          jit_size_h;
     struct rbb_inst inst[];
 };
 
@@ -48,6 +50,26 @@ static size_t jit_inst_size_f(struct rbb_inst const *ip) {
     return op_size[ip->op];
 }
 
+static size_t jit_inst_size_h(struct rbb_inst const *ip) {
+    if (ip->op == CALL) {
+        struct rbb const *callee = ip->call;
+        int const d = ip->d;
+        int const save_count = d < callee->regs ? d : callee->regs;
+        size_t bytes = 12;
+        if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
+        if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
+        return bytes;
+    }
+    static uint8_t const op_size[] = {
+        [IMM]=8,
+        [NEG]=4, [ABS]=4, [SQRT]=4, [FLOOR]=4, [CEIL]=4, [TRUNC]=4, [ROUND]=4,
+        [ADD]=4, [SUB]=4, [MUL]=4, [DIV]=4, [MIN]=4, [MAX]=4, [FMA]=4,
+        [EQ]=4,  [LT]=4,  [LE]=4,
+        [AND]=4, [OR]=4,  [XOR]=4, [NOT]=4, [SEL]=4,
+    };
+    return op_size[ip->op];
+}
+
 static uint32_t const enc_op_f[] = {
     [ADD]   = 0x4E20D400,  // FADD .4S
     [SUB]   = 0x4EA0D400,  // FSUB .4S
@@ -70,6 +92,29 @@ static uint32_t const enc_op_f[] = {
     [LE]    = 0x6E20E400,  // FCMGE .4S (use with operands swapped: x<=y == y>=x)
     [LT]    = 0x6EA0E400,  // FCMGT .4S (use with operands swapped: x<y  == y>x)
     [FMA]   = 0x4E20CC00,  // FMLA  .4S
+};
+static uint32_t const enc_op_h[] = {
+    [ADD]   = 0x4E401400,  // FADD   .8H
+    [SUB]   = 0x4EC01400,  // FSUB   .8H
+    [MUL]   = 0x6E401C00,  // FMUL   .8H
+    [DIV]   = 0x6E403C00,  // FDIV   .8H
+    [MIN]   = 0x4EC03400,  // FMIN   .8H
+    [MAX]   = 0x4E403400,  // FMAX   .8H
+    [NEG]   = 0x6EF8F800,  // FNEG   .8H
+    [ABS]   = 0x4EF8F800,  // FABS   .8H
+    [SQRT]  = 0x6EF9F800,  // FSQRT  .8H
+    [FLOOR] = 0x4E799800,  // FRINTM .8H
+    [CEIL]  = 0x4EF98800,  // FRINTP .8H
+    [TRUNC] = 0x4EF99800,  // FRINTZ .8H
+    [ROUND] = 0x6E798800,  // FRINTA .8H
+    [AND]   = 0x4E201C00,  // AND  .16B
+    [OR]    = 0x4EA01C00,  // ORR  .16B
+    [XOR]   = 0x6E201C00,  // EOR  .16B
+    [NOT]   = 0x6E205800,  // NOT  .16B
+    [EQ]    = 0x4E402400,  // FCMEQ .8H
+    [LE]    = 0x6E402400,  // FCMGE .8H (swapped)
+    [LT]    = 0x6EC02400,  // FCMGT .8H (swapped)
+    [FMA]   = 0x4E400C00,  // FMLA  .8H
 };
 static uint32_t enc_three_reg(uint32_t base, int rd, int rn, int rm) {
     return base
@@ -96,6 +141,21 @@ static uint32_t enc_STP_Q(int rt, int rt2, int rn, int offset) {
          | ((uint32_t)(rt2  & 0x1F) << 10)
          | ((uint32_t)(rn   & 0x1F) <<  5)
          | ((uint32_t)(rt   & 0x1F)      );
+}
+
+static uint32_t enc_LDR_Q(int rt, int rn, int offset) {
+    int const imm12 = offset >> 4;
+    return 0x3DC00000
+         | ((uint32_t)(imm12 & 0xFFF) << 10)
+         | ((uint32_t)(rn    & 0x1F)  <<  5)
+         | ((uint32_t)(rt    & 0x1F)       );
+}
+static uint32_t enc_STR_Q(int rt, int rn, int offset) {
+    int const imm12 = offset >> 4;
+    return 0x3D800000
+         | ((uint32_t)(imm12 & 0xFFF) << 10)
+         | ((uint32_t)(rn    & 0x1F)  <<  5)
+         | ((uint32_t)(rt    & 0x1F)       );
 }
 
 // STP <Dt1>, <Dt2>, [SP, #-16]!  pre-indexed (push pair, scaled by 8)
@@ -165,6 +225,12 @@ static uint32_t enc_MOVK_W(int rd, uint32_t imm16, int hw) {
 static int callee_saved_pairs_f(int regs) {
     return regs <= 4 ? 0 :
            regs <= 8 ? regs - 4 : 4;
+}
+
+static int callee_saves_h(int regs) {
+    if (regs <= 8) { return 0; }
+    int need = (regs < 16 ? regs : 16) - 8;
+    return (need + 1) / 2;
 }
 
 static _Bool has_op(struct rbb const *bb, enum rbb_op op) {
@@ -310,6 +376,122 @@ static size_t emit_jit_f(struct rbb const *bb, void *buf) {
     return trampoline_size;
 }
 
+static size_t emit_jit_h(struct rbb const *bb, void *buf) {
+    enum { X0=0, SP=31, X16=16 };
+    uint32_t *const buf_words = buf;
+    uint32_t *out = buf_words;
+
+    int const saves = callee_saves_h(bb->regs);
+    size_t const trampoline_size = 4 * (size_t)(2*saves + bb->in + bb->out + 4);
+
+    *out++ = ENC_PUSH_FP_LR;
+    for (int k = 0; k < saves; k++) {
+        *out++ = enc_STP_D_pre(2*k+8, 2*k+9, SP, -16);
+    }
+    for (int r = 0; r < bb->in; r++) {
+        *out++ = enc_LDR_Q(r, X0, 16*r);
+    }
+    {
+        ptrdiff_t const bl_word     = out - buf_words;
+        ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
+        *out++ = enc_BL((int)(target_word - bl_word));
+    }
+    for (int r = 0; r < bb->out; r++) {
+        *out++ = enc_STR_Q(r, X0, 16*r);
+    }
+    for (int k = saves; k --> 0;) {
+        *out++ = enc_LDP_D_post(2*k+8, 2*k+9, SP, 16);
+    }
+    *out++ = ENC_POP_FP_LR;
+    *out++ = ENC_RET;
+    assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
+
+    _Bool const kernel_has_call = has_op(bb, CALL);
+    if (kernel_has_call) {
+        *out++ = ENC_PUSH_FP_LR;
+    }
+    for (int i = 0; i < bb->insts; i++) {
+        struct rbb_inst const *ip = bb->inst + i;
+        switch (ip->op) {
+            case ADD: case SUB: case MUL: case DIV: case MIN: case MAX:
+            case AND: case OR:  case XOR:
+            case EQ:
+                *out++ = enc_three_reg(enc_op_h[ip->op], ip->d, ip->x, ip->y);
+                break;
+
+            case LT: case LE:
+                *out++ = enc_three_reg(enc_op_h[ip->op], ip->d, ip->y, ip->x);
+                break;
+
+            case NEG: case ABS: case NOT:
+            case SQRT: case FLOOR: case CEIL: case TRUNC: case ROUND:
+                *out++ = enc_two_reg(enc_op_h[ip->op], ip->d, ip->x);
+                break;
+
+            case FMA:
+                *out++ = enc_three_reg(enc_op_h[FMA], ip->d, ip->x, ip->y);
+                break;
+
+            case SEL:
+                *out++ = enc_three_reg(0x6E601C00, ip->d, ip->x, ip->y);
+                break;
+
+            case IMM: {
+                union { _Float16 h; uint16_t u; } v = { (_Float16)ip->imm };
+                *out++ = enc_MOVZ_W(X16, v.u, 0);
+                *out++ = enc_two_reg(0x4E020C00, ip->d, X16);  // DUP Vd.8H, W16
+            } break;
+
+            case CALL: {
+                struct rbb const *callee = ip->call;
+                int const cregs = callee->regs;
+                int const cin   = callee->in;
+                int const cout  = callee->out;
+                int const d     = ip->d;
+                int const save_count = d < cregs ? d : cregs;
+
+                if (save_count > 0) {
+                    *out++ = enc_SUB_SP(16 * save_count);
+                    for (int r = 0; r < save_count; r++) {
+                        *out++ = enc_STR_Q(r, SP, 16*r);
+                    }
+                }
+                for (int j = 0; j < cin && d > 0; j++) {
+                    *out++ = enc_three_reg(enc_op_h[OR], j, d+j, d+j);
+                }
+                {
+                    intptr_t const pc        = (intptr_t)out;
+                    intptr_t const tgt       = (intptr_t)callee->jit_kernel_h;
+                    intptr_t const adrp_page = pc  & ~(intptr_t)0xFFF;
+                    intptr_t const tgt_page  = tgt & ~(intptr_t)0xFFF;
+                    int const imm21 = (int)((tgt_page - adrp_page) >> 12);
+                    int const imm12 = (int)(tgt & 0xFFFu);
+                    *out++ = enc_ADRP   (X16, imm21);
+                    *out++ = enc_ADD_imm(X16, X16, imm12);
+                    *out++ = enc_BLR    (X16);
+                }
+                for (int j = cout; j --> 0 && d > 0;) {
+                    *out++ = enc_three_reg(enc_op_h[OR], d+j, j, j);
+                }
+                if (save_count > 0) {
+                    for (int r = 0; r < save_count; r++) {
+                        *out++ = enc_LDR_Q(r, SP, 16*r);
+                    }
+                    *out++ = enc_ADD_SP(16 * save_count);
+                }
+            } break;
+        }
+    }
+
+    if (kernel_has_call) {
+        *out++ = ENC_POP_FP_LR;
+    }
+    *out++ = ENC_RET;
+
+    assert( (char*)out - (char*)buf == (ptrdiff_t)bb->jit_size_h );
+    return trampoline_size;
+}
+
 struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     size_t const inst_size = (size_t)insts * sizeof *inst;
 
@@ -407,13 +589,45 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         }
     }
 
+    if (rbb->regs <= MAX_JIT_REGS_H) {
+        int const saves = callee_saves_h(rbb->regs);
+        size_t const trampoline = 4 * (size_t)(2*saves + rbb->in + rbb->out + 4);
+        size_t       body       = 0;
+        size_t const x30_frame  = has_op(rbb, CALL) ? 8 : 0;
+        for (int i = 0; i < rbb->insts; i++) {
+            struct rbb_inst const *ip = rbb->inst + i;
+            if (ip->op == CALL && ip->call->jit_kernel_h == NULL) {
+                body = 0;
+                break;
+            }
+            body += jit_inst_size_h(ip);
+        }
+        if (rbb->insts == 0 || body > 0) {
+            rbb->jit_size_h = trampoline + x30_frame + body + 4;
+        }
+    }
+
+    if (rbb->jit_size_h > 0) {
+        void *buf = mmap(NULL, rbb->jit_size_h,
+                         PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+        if (buf != MAP_FAILED) {
+            size_t const kernel_offset = emit_jit_h(rbb, buf);
+            if (0 == mprotect(buf, rbb->jit_size_h, PROT_READ|PROT_EXEC)) {
+                __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_h);
+                rbb->jit_trampoline_h = buf;
+                rbb->jit_kernel_h     = (char*)buf + kernel_offset;
+            } else {
+                munmap(buf, rbb->jit_size_h);
+            }
+        }
+    }
+
     return rbb;
 }
 
 void rbb_free(struct rbb *bb) {
-    if (bb->jit_trampoline_f) {
-        munmap(bb->jit_trampoline_f, bb->jit_size_f);
-    }
+    if (bb->jit_trampoline_f) { munmap(bb->jit_trampoline_f, bb->jit_size_f); }
+    if (bb->jit_trampoline_h) { munmap(bb->jit_trampoline_h, bb->jit_size_h); }
     free(bb);
 }
 
@@ -422,11 +636,12 @@ struct rbb_meta rbb_meta(struct rbb const *bb) {
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
-        .jit       = bb->jit_trampoline_f != NULL,
+        .jit_f     = bb->jit_trampoline_f != NULL,
+        .jit_h     = bb->jit_trampoline_h != NULL,
     };
 }
 
-void rbb_evalf(struct rbb const *rbb, v8f reg[]) {
+void rbb_eval_f(struct rbb const *rbb, v8f reg[]) {
     if (rbb->jit_trampoline_f) {
         void (*fn)(v8f*);
         memcpy(&fn, &rbb->jit_trampoline_f, sizeof fn);
@@ -470,7 +685,57 @@ void rbb_evalf(struct rbb const *rbb, v8f reg[]) {
             case SEL:   d = (v8f)( ( (v8i)reg[ip->d] & (v8i)reg[ip->x])
                                  | (~(v8i)reg[ip->d] & (v8i)reg[ip->y]) ); break;
 
-            case CALL: rbb_evalf(ip->call, reg + ip->d); continue;
+            case CALL: rbb_eval_f(ip->call, reg + ip->d); continue;
+        }
+        reg[ip->d] = d;
+    }
+}
+
+void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
+    if (rbb->jit_trampoline_h) {
+        void (*fn)(v8h*);
+        memcpy(&fn, &rbb->jit_trampoline_h, sizeof fn);
+        fn(reg);
+        return;
+    }
+
+    for (int i = 0; i < rbb->insts; i++) {
+        struct rbb_inst const *ip = rbb->inst + i;
+        v8h d = {0};
+        switch (ip->op) {
+            case IMM:   d = (_Float16)ip->imm; break;
+
+            case NEG:   d = -(reg[ip->x]); break;
+            case ABS:   d = __builtin_elementwise_abs  (reg[ip->x]); break;
+            case SQRT:  d = __builtin_elementwise_sqrt (reg[ip->x]); break;
+            case FLOOR: d = __builtin_elementwise_floor(reg[ip->x]); break;
+            case CEIL:  d = __builtin_elementwise_ceil (reg[ip->x]); break;
+            case TRUNC: d = __builtin_elementwise_trunc(reg[ip->x]); break;
+            case ROUND: d = __builtin_elementwise_round(reg[ip->x]); break;
+
+            case ADD:   d = reg[ip->x] + reg[ip->y]; break;
+            case SUB:   d = reg[ip->x] - reg[ip->y]; break;
+            case MUL:   d = reg[ip->x] * reg[ip->y]; break;
+            case DIV:   d = reg[ip->x] / reg[ip->y]; break;
+            case MIN:   d = __builtin_elementwise_min(reg[ip->x], reg[ip->y]); break;
+            case MAX:   d = __builtin_elementwise_max(reg[ip->x], reg[ip->y]); break;
+            case FMA:   d = __builtin_elementwise_fma(reg[ip->x], reg[ip->y], reg[ip->d]); break;
+
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wfloat-equal"
+            case EQ:    d = (v8h)(reg[ip->x] == reg[ip->y]); break;
+            case LT:    d = (v8h)(reg[ip->x] <  reg[ip->y]); break;
+            case LE:    d = (v8h)(reg[ip->x] <= reg[ip->y]); break;
+        #pragma GCC diagnostic pop
+
+            case AND:   d = (v8h)( (v8s)reg[ip->x] & (v8s)reg[ip->y] ); break;
+            case OR:    d = (v8h)( (v8s)reg[ip->x] | (v8s)reg[ip->y] ); break;
+            case XOR:   d = (v8h)( (v8s)reg[ip->x] ^ (v8s)reg[ip->y] ); break;
+            case NOT:   d = (v8h)(~(v8s)reg[ip->x]); break;
+            case SEL:   d = (v8h)( ( (v8s)reg[ip->d] & (v8s)reg[ip->x])
+                                 | (~(v8s)reg[ip->d] & (v8s)reg[ip->y]) ); break;
+
+            case CALL: rbb_eval_h(ip->call, reg + ip->d); continue;
         }
         reg[ip->d] = d;
     }
