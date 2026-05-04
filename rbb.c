@@ -234,7 +234,7 @@ static int callee_saves_1q(int regs) {
 }
 
 // Returns the offset of the kernel within buf (= trampoline_size).
-static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_has_call) {
+static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is_leaf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
@@ -264,7 +264,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_ha
     *out++ = ENC_RET;
     assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
     }
     for (int i = 0; i < bb->insts; i++) {
@@ -341,7 +341,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_ha
         }
     }
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_POP_FP_LR;
     }
     *out++ = ENC_RET;
@@ -350,7 +350,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_ha
     return trampoline_size;
 }
 
-static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_has_call) {
+static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is_leaf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
@@ -380,7 +380,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_ha
     *out++ = ENC_RET;
     assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
     }
     for (int i = 0; i < bb->insts; i++) {
@@ -445,7 +445,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_ha
         }
     }
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_POP_FP_LR;
     }
     *out++ = ENC_RET;
@@ -454,7 +454,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_ha
     return trampoline_size;
 }
 
-static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_has_call) {
+static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is_leaf) {
     enum { X0=0, SP=31, X16=16 };
     uint32_t *const buf_words = buf;
     uint32_t *out = buf_words;
@@ -495,7 +495,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_ha
     *out++ = ENC_RET;
     assert( (char*)out - (char*)buf == (ptrdiff_t)trampoline_size );
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_PUSH_FP_LR;
     }
     for (int i = 0; i < bb->insts; i++) {
@@ -561,7 +561,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_ha
         }
     }
 
-    if (kernel_has_call) {
+    if (!kernel_is_leaf) {
         *out++ = ENC_POP_FP_LR;
     }
     *out++ = ENC_RET;
@@ -595,11 +595,11 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         _Bool input, written, output;
     } *meta = calloc((size_t)regs, sizeof *meta);
 
-    _Bool kernel_has_call = 0;
+    _Bool kernel_is_leaf = 1;
     for (int i = 0; i < rbb->insts; i++) {
         struct rbb_inst const *ip = rbb->inst + i;
         if (ip->op == CALL) {
-            kernel_has_call = 1;
+            kernel_is_leaf = 0;
             for (int in = 0; in < ip->call->in; in++) {
                 int const r = ip->d + in;
                 if (!meta[r].written) {
@@ -636,7 +636,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         int const save_pairs = callee_saves_f8(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*save_pairs + rbb->in + rbb->out + 4);
         size_t       body       = 0;
-        size_t const x30_frame  = kernel_has_call ? 8 : 0;
+        size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
             if (ip->op == CALL && ip->call->jit_kernel_f8 == NULL) {
@@ -654,7 +654,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         void *buf = mmap(NULL, rbb->jit_size_f8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit_f8(rbb, buf, kernel_has_call);
+            size_t const kernel_offset = emit_jit_f8(rbb, buf, kernel_is_leaf);
             if (0 == mprotect(buf, rbb->jit_size_f8, PROT_READ|PROT_EXEC)) {
                 __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f8);
                 rbb->jit_trampoline_f8 = buf;
@@ -669,7 +669,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         int const saves = callee_saves_1q(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*saves + 2*rbb->in + 2*rbb->out + 5);
         size_t       body       = 0;
-        size_t const x30_frame  = kernel_has_call ? 8 : 0;
+        size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
             if (ip->op == CALL && ip->call->jit_kernel_f4 == NULL) {
@@ -687,7 +687,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         void *buf = mmap(NULL, rbb->jit_size_f4,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit_f4(rbb, buf, kernel_has_call);
+            size_t const kernel_offset = emit_jit_f4(rbb, buf, kernel_is_leaf);
             if (0 == mprotect(buf, rbb->jit_size_f4, PROT_READ|PROT_EXEC)) {
                 __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_f4);
                 rbb->jit_trampoline_f4 = buf;
@@ -702,7 +702,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         int const saves = callee_saves_1q(rbb->regs);
         size_t const trampoline = 4 * (size_t)(2*saves + rbb->in + rbb->out + 4);
         size_t       body       = 0;
-        size_t const x30_frame  = kernel_has_call ? 8 : 0;
+        size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
             struct rbb_inst const *ip = rbb->inst + i;
             if (ip->op == CALL && ip->call->jit_kernel_h8 == NULL) {
@@ -720,7 +720,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         void *buf = mmap(NULL, rbb->jit_size_h8,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
-            size_t const kernel_offset = emit_jit_h8(rbb, buf, kernel_has_call);
+            size_t const kernel_offset = emit_jit_h8(rbb, buf, kernel_is_leaf);
             if (0 == mprotect(buf, rbb->jit_size_h8, PROT_READ|PROT_EXEC)) {
                 __builtin___clear_cache(buf, (char*)buf + rbb->jit_size_h8);
                 rbb->jit_trampoline_h8 = buf;
