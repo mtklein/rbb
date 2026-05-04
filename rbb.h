@@ -3,8 +3,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// TODO: single-pump v8f JIT when it can't fit in double-pump registers?
-// TODO: use natural register sizes v4f, v8h?
 // TODO: LT,LE -> GT,GE?
 
 typedef float    v8f __attribute__((ext_vector_type(8)));
