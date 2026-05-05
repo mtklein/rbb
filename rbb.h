@@ -40,4 +40,16 @@ struct cfg {
 };
 void cfg_free(struct cfg*);
 
-struct cfg* store_565(uint16_t*);
+struct rgba_fp16 {
+    _Float16 r,g,b,a;
+};
+
+struct cfg* load_565    (        uint16_t const*);
+struct cfg* load_8888   (        uint32_t const*);
+struct cfg* load_1010102(        uint32_t const*);
+struct cfg* load_fp16   (struct rgba_fp16 const*);
+
+struct cfg* store_565    (        uint16_t*, struct cfg const *rgb);
+struct cfg* store_8888   (        uint32_t*, struct cfg const *rgba);
+struct cfg* store_1010102(        uint32_t*, struct cfg const *rgba);
+struct cfg* store_fp16   (struct rgba_fp16*, struct cfg const *rgba);
