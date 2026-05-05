@@ -32,3 +32,12 @@ struct rbb_meta rbb_meta(struct rbb const*);
 void            rbb_eval_f(struct rbb const*, v8f reg[]);
 void            rbb_eval_h(struct rbb const*, v8h reg[]);
 void            rbb_free(struct rbb*);
+
+struct cfg {
+    void (*free)(struct cfg*);
+    void (*eval_f)(struct cfg const*, v8f reg[]);
+    void (*eval_h)(struct cfg const*, v8h reg[]);
+};
+void cfg_free(struct cfg*);
+
+struct cfg* store_565(uint16_t*);

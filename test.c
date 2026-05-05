@@ -555,6 +555,46 @@ static void test_jit_f_single_pump(void) {
     rbb_free(bb);
 }
 
+static void test_store_565_f(void) {
+    uint16_t dst[8] = {0};
+    struct cfg *node = store_565(dst);
+    v8f reg[] = {
+        {0, 1, 0, 0, 1, 0, 1, 0.5},   // R
+        {0, 1, 0, 1, 0, 1, 1, 0.5},   // G
+        {0, 1, 1, 0, 0, 1, 1, 0.5},   // B
+    };
+    node->eval_f(node, reg);
+    dst[0] == 0x0000 here;  // black
+    dst[1] == 0xFFFF here;  // white
+    dst[2] == 0x001F here;  // blue
+    dst[3] == 0x07E0 here;  // green
+    dst[4] == 0xF800 here;  // red
+    dst[5] == 0x07FF here;  // cyan
+    dst[6] == 0xFFFF here;  // white again
+    dst[7] == ((16<<11) | (32<<5) | 16) here;  // mid grey
+    cfg_free(node);
+}
+
+static void test_store_565_h(void) {
+    uint16_t dst[8] = {0};
+    struct cfg *node = store_565(dst);
+    v8h reg[] = {
+        {0, 1, 0, 0, 1, 0, 1, 0.5},
+        {0, 1, 0, 1, 0, 1, 1, 0.5},
+        {0, 1, 1, 0, 0, 1, 1, 0.5},
+    };
+    node->eval_h(node, reg);
+    dst[0] == 0x0000 here;
+    dst[1] == 0xFFFF here;
+    dst[2] == 0x001F here;
+    dst[3] == 0x07E0 here;
+    dst[4] == 0xF800 here;
+    dst[5] == 0x07FF here;
+    dst[6] == 0xFFFF here;
+    dst[7] == ((16<<11) | (32<<5) | 16) here;
+    cfg_free(node);
+}
+
 int main(void) {
     test_IMM();
     test_NEG();
@@ -621,5 +661,8 @@ int main(void) {
     test_jit_f_supported();
     test_jit_h_supported();
     test_jit_f_single_pump();
+
+    test_store_565_f();
+    test_store_565_h();
     return 0;
 }

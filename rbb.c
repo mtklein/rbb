@@ -852,3 +852,44 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
         reg[ip->d] = d;
     }
 }
+
+void cfg_free(struct cfg *cfg) {
+    if (cfg) {
+        cfg->free(cfg);
+    }
+}
+
+static void just_free(struct cfg *cfg) {
+    free(cfg);
+}
+
+struct store_565 {
+    struct cfg cfg;
+    uint16_t  *dst;
+};
+static void store_565_eval_f(struct cfg const *cfg, v8f reg[]) {
+    struct store_565 const *n = (struct store_565 const*)cfg;
+    v8i const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8i),
+              G = __builtin_convertvector(reg[1] * 63 + 0.5, v8i),
+              B = __builtin_convertvector(reg[2] * 31 + 0.5, v8i);
+    v8s const px = __builtin_convertvector((R << 11) | (G << 5) | B, v8s);
+    __builtin_memcpy(n->dst, &px, sizeof px);
+}
+static void store_565_eval_h(struct cfg const *cfg, v8h reg[]) {
+    struct store_565 const *n = (struct store_565 const*)cfg;
+    v8s const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8s),
+              G = __builtin_convertvector(reg[1] * 63 + 0.5, v8s),
+              B = __builtin_convertvector(reg[2] * 31 + 0.5, v8s);
+    v8s const px = ((R << 11) | (G << 5) | B);
+    __builtin_memcpy(n->dst, &px, sizeof px);
+}
+struct cfg* store_565(uint16_t *dst) {
+    struct store_565 *n = malloc(sizeof *n);
+    n->cfg = (struct cfg) {
+        .free   = just_free,
+        .eval_f = store_565_eval_f,
+        .eval_h = store_565_eval_h,
+    };
+    n->dst = dst;
+    return &n->cfg;
+}
