@@ -252,7 +252,7 @@ static void test_CALL_then_op(void) {
 }
 
 static void check_meta(struct rbb const *bb, int inputs, int outputs, int registers) {
-    struct rbb_meta const m = rbb_meta(bb);
+    struct cfg_meta const m = rbb_meta(bb);
     m.inputs    == inputs    here;
     m.outputs   == outputs   here;
     m.registers == registers here;
@@ -313,7 +313,7 @@ static void test_meta_CALL(void) {
 
 static void test_jit_f_supported(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
+    struct cfg_meta meta = rbb_meta(bb);
     meta.jit_f here;
     rbb_free(bb);
 }
@@ -543,14 +543,14 @@ static void test_CALL_then_op_h(void) {
 
 static void test_jit_h_supported(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
+    struct cfg_meta meta = rbb_meta(bb);
     meta.jit_h here;
     rbb_free(bb);
 }
 
 static void test_jit_f_single_pump(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=20, .x=20, .y=20}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
+    struct cfg_meta meta = rbb_meta(bb);
     meta.jit_f here;
     rbb_free(bb);
 }

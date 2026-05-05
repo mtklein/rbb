@@ -737,8 +737,8 @@ void rbb_free(struct rbb *bb) {
     free(bb);
 }
 
-struct rbb_meta rbb_meta(struct rbb const *bb) {
-    return (struct rbb_meta){
+struct cfg_meta rbb_meta(struct rbb const *bb) {
+    return (struct cfg_meta){
         .inputs    = bb->in,
         .outputs   = bb->out,
         .registers = bb->regs,
@@ -863,9 +863,10 @@ struct load {
     struct cfg  cfg;
     void const *src;
 };
-static void load_free(struct cfg *cfg) {
-    free(cfg);
-}
+static void load_free(struct cfg *cfg) { free(cfg); }
+
+static struct cfg_meta load_rgb_meta (struct cfg const *cfg) { (void)cfg; return (struct cfg_meta){.outputs=3, .registers=3}; }
+static struct cfg_meta load_rgba_meta(struct cfg const *cfg) { (void)cfg; return (struct cfg_meta){.outputs=4, .registers=4}; }
 
 struct store {
     struct cfg  cfg;
@@ -876,6 +877,10 @@ static void store_free(struct cfg *cfg) {
     struct store *node = (struct store*)cfg;
     node->input->free(node->input);
     free(node);
+}
+static struct cfg_meta store_meta(struct cfg const *cfg) {
+    struct store const *node = (struct store const*)cfg;
+    return node->input->meta(node->input);
 }
 
 static void load_565_eval_f(struct cfg const *cfg, v8f reg[]) {
@@ -901,6 +906,7 @@ struct cfg* load_565(uint16_t const *src) {
         .free   = load_free,
         .eval_f = load_565_eval_f,
         .eval_h = load_565_eval_h,
+        .meta   = load_rgb_meta,
     };
     node->src = src;
     return &node->cfg;
@@ -930,6 +936,7 @@ struct cfg* load_8888(uint32_t const *src) {
         .free   = load_free,
         .eval_f = load_8888_eval_f,
         .eval_h = load_8888_eval_h,
+        .meta   = load_rgba_meta,
     };
     node->src = src;
     return &node->cfg;
@@ -959,6 +966,7 @@ struct cfg* load_1010102(uint32_t const *src) {
         .free   = load_free,
         .eval_f = load_1010102_eval_f,
         .eval_h = load_1010102_eval_h,
+        .meta   = load_rgba_meta,
     };
     node->src = src;
     return &node->cfg;
@@ -990,6 +998,7 @@ struct cfg* load_fp16(struct rgba_fp16 const *src) {
         .free   = load_free,
         .eval_f = load_fp16_eval_f,
         .eval_h = load_fp16_eval_h,
+        .meta   = load_rgba_meta,
     };
     node->src = src;
     return &node->cfg;
@@ -1019,6 +1028,7 @@ struct cfg* store_565(uint16_t *dst, struct cfg *rgb) {
         .free   = store_free,
         .eval_f = store_565_eval_f,
         .eval_h = store_565_eval_h,
+        .meta   = store_meta,
     };
     node->dst   = dst;
     node->input = rgb;
@@ -1054,6 +1064,7 @@ struct cfg* store_8888(uint32_t *dst, struct cfg *rgba) {
         .free   = store_free,
         .eval_f = store_8888_eval_f,
         .eval_h = store_8888_eval_h,
+        .meta   = store_meta,
     };
     node->dst   = dst;
     node->input = rgba;
@@ -1086,6 +1097,7 @@ struct cfg* store_1010102(uint32_t *dst, struct cfg *rgba) {
         .free   = store_free,
         .eval_f = store_1010102_eval_f,
         .eval_h = store_1010102_eval_h,
+        .meta   = store_meta,
     };
     node->dst   = dst;
     node->input = rgba;
@@ -1120,6 +1132,7 @@ struct cfg* store_fp16(struct rgba_fp16 *dst, struct cfg *rgba) {
         .free   = store_free,
         .eval_f = store_fp16_eval_f,
         .eval_h = store_fp16_eval_h,
+        .meta   = store_meta,
     };
     node->dst   = dst;
     node->input = rgba;
