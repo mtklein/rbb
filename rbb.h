@@ -45,6 +45,8 @@ struct cfg_load load_8888   (uint32_t const*);
 struct cfg_load load_1010102(uint32_t const*);
 struct cfg_load load_fp16   (v4h      const*);
 
+// TODO: cfg_gather
+
 struct cfg_store {
     struct cfg        cfg;
     void             *dst;
@@ -61,3 +63,6 @@ struct cfg_rbb {
     struct cfg const *input;
 };
 struct cfg_rbb cfg_rbb(struct rbb const*, struct cfg const *input);
+
+// TODO: cfg_branch_if_any, cfg_branch_if_all
+// TODO: cfg_loop_if_any, cfg_loop_if_all   -- or are these just cfg_branch_if_any/all?
