@@ -49,7 +49,7 @@ struct cfg* load_8888   (        uint32_t const*);
 struct cfg* load_1010102(        uint32_t const*);
 struct cfg* load_fp16   (struct rgba_fp16 const*);
 
-struct cfg* store_565    (        uint16_t*, struct cfg *rgb);
-struct cfg* store_8888   (        uint32_t*, struct cfg *rgba);
-struct cfg* store_1010102(        uint32_t*, struct cfg *rgba);
-struct cfg* store_fp16   (struct rgba_fp16*, struct cfg *rgba);
+struct cfg* store_565    (        uint16_t*, struct cfg const *rgb);
+struct cfg* store_8888   (        uint32_t*, struct cfg const *rgba);
+struct cfg* store_1010102(        uint32_t*, struct cfg const *rgba);
+struct cfg* store_fp16   (struct rgba_fp16*, struct cfg const *rgba);
