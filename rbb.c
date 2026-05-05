@@ -854,18 +854,18 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
 }
 
 static void load_565_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8s px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     v8i const wide = __builtin_convertvector(px, v8i);
     reg[0] = __builtin_convertvector((wide >> 11) & 31, v8f) * (1/31.0f);
     reg[1] = __builtin_convertvector((wide >>  5) & 63, v8f) * (1/63.0f);
     reg[2] = __builtin_convertvector((wide      ) & 31, v8f) * (1/31.0f);
 }
 static void load_565_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8s px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     reg[0] = __builtin_convertvector((px >> 11) & 31, v8h) * (_Float16)(1/31.0f);
     reg[1] = __builtin_convertvector((px >>  5) & 63, v8h) * (_Float16)(1/63.0f);
     reg[2] = __builtin_convertvector((px      ) & 31, v8h) * (_Float16)(1/31.0f);
@@ -878,18 +878,18 @@ struct cfg_load load_565(uint16_t const *src) {
 }
 
 static void load_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8i px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 255, v8f) * (1/255.0f);
     reg[1] = __builtin_convertvector((px >>  8) & 255, v8f) * (1/255.0f);
     reg[2] = __builtin_convertvector((px >> 16) & 255, v8f) * (1/255.0f);
     reg[3] = __builtin_convertvector((px >> 24) & 255, v8f) * (1/255.0f);
 }
 static void load_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8i px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 255, v8h) * (_Float16)(1/255.0f);
     reg[1] = __builtin_convertvector((px >>  8) & 255, v8h) * (_Float16)(1/255.0f);
     reg[2] = __builtin_convertvector((px >> 16) & 255, v8h) * (_Float16)(1/255.0f);
@@ -903,18 +903,18 @@ struct cfg_load load_8888(uint32_t const *src) {
 }
 
 static void load_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8i px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 1023, v8f) * (1/1023.0f);
     reg[1] = __builtin_convertvector((px >> 10) & 1023, v8f) * (1/1023.0f);
     reg[2] = __builtin_convertvector((px >> 20) & 1023, v8f) * (1/1023.0f);
     reg[3] = __builtin_convertvector((px >> 30) &    3, v8f) * (1/3.0f);
 }
 static void load_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8i px;
-    __builtin_memcpy(&px, n->src, sizeof px);
+    __builtin_memcpy(&px, node->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 1023, v8h) * (_Float16)(1/1023.0f);
     reg[1] = __builtin_convertvector((px >> 10) & 1023, v8h) * (_Float16)(1/1023.0f);
     reg[2] = __builtin_convertvector((px >> 20) & 1023, v8h) * (_Float16)(1/1023.0f);
@@ -928,8 +928,8 @@ struct cfg_load load_1010102(uint32_t const *src) {
 }
 
 static void load_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
-    v4h const *src = n->src;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
+    v4h const *src = node->src;
     for (int i = 0; i < 8; i++) {
         reg[0][i] = (float)src[i].r;
         reg[1][i] = (float)src[i].g;
@@ -938,8 +938,8 @@ static void load_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
     }
 }
 static void load_fp16_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_load const *n = (struct cfg_load const*)cfg;
-    v4h const *src = n->src;
+    struct cfg_load const *node = (struct cfg_load const*)cfg;
+    v4h const *src = node->src;
     for (int i = 0; i < 8; i++) {
         reg[0][i] = src[i].r;
         reg[1][i] = src[i].g;
@@ -955,22 +955,22 @@ struct cfg_load load_fp16(v4h const *src) {
 }
 
 static void store_565_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_f(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_f(node->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 63 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 31 + 0.5, v8i);
     v8s const px = __builtin_convertvector((R << 11) | (G << 5) | B, v8s);
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 static void store_565_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_h(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_h(node->input, reg);
     v8s const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8s),
               G = __builtin_convertvector(reg[1] * 63 + 0.5, v8s),
               B = __builtin_convertvector(reg[2] * 31 + 0.5, v8s);
     v8s const px = (R << 11) | (G << 5) | B;
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 struct cfg_store store_565(uint16_t *dst, struct cfg const *rgb) {
     return (struct cfg_store) {
@@ -981,18 +981,18 @@ struct cfg_store store_565(uint16_t *dst, struct cfg const *rgb) {
 }
 
 static void store_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_f(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_f(node->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 255 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 255 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 255 + 0.5, v8i),
               A = __builtin_convertvector(reg[3] * 255 + 0.5, v8i);
     v8i const px = R | (G << 8) | (B << 16) | (A << 24);
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 static void store_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_h(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_h(node->input, reg);
     v8s const R = __builtin_convertvector(reg[0] * 255 + 0.5, v8s),
               G = __builtin_convertvector(reg[1] * 255 + 0.5, v8s),
               B = __builtin_convertvector(reg[2] * 255 + 0.5, v8s),
@@ -1001,7 +1001,7 @@ static void store_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
                  | (__builtin_convertvector(G, v8i) <<  8)
                  | (__builtin_convertvector(B, v8i) << 16)
                  | (__builtin_convertvector(A, v8i) << 24);
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 struct cfg_store store_8888(uint32_t *dst, struct cfg const *rgba) {
     return (struct cfg_store) {
@@ -1012,24 +1012,24 @@ struct cfg_store store_8888(uint32_t *dst, struct cfg const *rgba) {
 }
 
 static void store_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_f(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_f(node->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 1023 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 1023 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 1023 + 0.5, v8i),
               A = __builtin_convertvector(reg[3] *    3 + 0.5, v8i);
     v8i const px = R | (G << 10) | (B << 20) | (A << 30);
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 static void store_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_h(n->input, reg);
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_h(node->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 1023 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 1023 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 1023 + 0.5, v8i),
               A = __builtin_convertvector(reg[3] *    3 + 0.5, v8i);
     v8i const px = R | (G << 10) | (B << 20) | (A << 30);
-    __builtin_memcpy(n->dst, &px, sizeof px);
+    __builtin_memcpy(node->dst, &px, sizeof px);
 }
 struct cfg_store store_1010102(uint32_t *dst, struct cfg const *rgba) {
     return (struct cfg_store) {
@@ -1040,9 +1040,9 @@ struct cfg_store store_1010102(uint32_t *dst, struct cfg const *rgba) {
 }
 
 static void store_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_f(n->input, reg);
-    v4h *dst = n->dst;
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_f(node->input, reg);
+    v4h *dst = node->dst;
     for (int i = 0; i < 8; i++) {
         dst[i] = (v4h){
             (_Float16)reg[0][i],
@@ -1053,9 +1053,9 @@ static void store_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
     }
 }
 static void store_fp16_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct cfg_store const *n = (struct cfg_store const*)cfg;
-    n->input->eval_h(n->input, reg);
-    v4h *dst = n->dst;
+    struct cfg_store const *node = (struct cfg_store const*)cfg;
+    node->input->eval_h(node->input, reg);
+    v4h *dst = node->dst;
     for (int i = 0; i < 8; i++) {
         dst[i] = (v4h){
             reg[0][i],
