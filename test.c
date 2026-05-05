@@ -23,203 +23,171 @@ static _Bool exact_h(_Float16 x, _Float16 y) {
 }
 
 static void test_IMM(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=3.14f}, 1);
-    v8f reg[] = {0};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 3.14f) here;
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=3.5}, 1);
+    { v8f reg[] = {0}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 3.5) here; }
+    { v8h reg[] = {0}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 3.5) here; }
     rbb_free(bb);
 }
 
 static void test_NEG(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
-    v8f reg[] = {42};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, -42) here;
+    { v8f reg[] = {42}; rbb_eval_f(bb, reg); exact_f(reg[0].x, -42) here; }
+    { v8h reg[] = {42}; rbb_eval_h(bb, reg); exact_h(reg[0].x, -42) here; }
     rbb_free(bb);
 }
 
 static void test_ABS(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ABS, .d=0, .x=0}, 1);
-    v8f reg[] = {-42};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 42) here;
+    { v8f reg[] = {-42}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 42) here; }
+    { v8h reg[] = {-42}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 42) here; }
     rbb_free(bb);
 }
 
 static void test_SQRT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SQRT, .d=0, .x=0}, 1);
-    v8f reg[] = {49};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 7) here;
+    { v8f reg[] = {49}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 7) here; }
+    { v8h reg[] = {49}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 7) here; }
     rbb_free(bb);
 }
 
 static void test_FLOOR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=FLOOR, .d=0, .x=0}, 1);
-    v8f reg[] = {1.7f};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 1) here;
+    { v8f reg[] = {1.75}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 1) here; }
+    { v8h reg[] = {1.75}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 1) here; }
     rbb_free(bb);
 }
 
 static void test_CEIL(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=CEIL, .d=0, .x=0}, 1);
-    v8f reg[] = {1.3f};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 2) here;
+    { v8f reg[] = {1.25}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 2) here; }
+    { v8h reg[] = {1.25}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 2) here; }
     rbb_free(bb);
 }
 
 static void test_TRUNC(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=TRUNC, .d=0, .x=0}, 1);
-    v8f reg[] = {-1.7f};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, -1) here;
+    { v8f reg[] = {-1.75}; rbb_eval_f(bb, reg); exact_f(reg[0].x, -1) here; }
+    { v8h reg[] = {-1.75}; rbb_eval_h(bb, reg); exact_h(reg[0].x, -1) here; }
     rbb_free(bb);
 }
 
 static void test_ROUND(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ROUND, .d=0, .x=0}, 1);
-    v8f reg[] = {1.5f};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 2) here;
+    { v8f reg[] = {1.5}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 2) here; }
+    { v8h reg[] = {1.5}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 2) here; }
     rbb_free(bb);
 }
 
 static void test_ADD(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-
-    v8f reg[] = {42, 47};
-    rbb_eval_f(bb, reg);
-
-    exact_f(reg[0].x, 89) here;
-    exact_f(reg[1].y, 47) here;
-
+    { v8f reg[] = {42, 47}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 89) here; }
+    { v8h reg[] = {42, 47}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 89) here; }
     rbb_free(bb);
 }
 
 static void test_SUB(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SUB, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {47, 42};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 5) here;
+    { v8f reg[] = {47, 42}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 5) here; }
+    { v8h reg[] = {47, 42}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 5) here; }
     rbb_free(bb);
 }
 
 static void test_MUL(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MUL, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {6, 7};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 42) here;
+    { v8f reg[] = {6, 7}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 42) here; }
+    { v8h reg[] = {6, 7}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 42) here; }
     rbb_free(bb);
 }
 
 static void test_DIV(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=DIV, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {84, 2};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 42) here;
+    { v8f reg[] = {84, 2}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 42) here; }
+    { v8h reg[] = {84, 2}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 42) here; }
     rbb_free(bb);
 }
 
 static void test_MIN(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MIN, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {3, 5};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 3) here;
+    { v8f reg[] = {3, 5}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 3) here; }
+    { v8h reg[] = {3, 5}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 3) here; }
     rbb_free(bb);
 }
 
 static void test_MAX(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=MAX, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {3, 5};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 5) here;
+    { v8f reg[] = {3, 5}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 5) here; }
+    { v8h reg[] = {3, 5}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 5) here; }
     rbb_free(bb);
 }
 
 static void test_FMA(void) {
-    // FMA d += x*y :  reg[0] = reg[0] + reg[1] * reg[2] = 4 + 2*3 = 10.
     struct rbb *bb = rbb(&(struct rbb_inst){.op=FMA, .d=0, .x=1, .y=2}, 1);
-    v8f reg[] = {4, 2, 3};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 10) here;
+    { v8f reg[] = {4, 2, 3}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 10) here; }
+    { v8h reg[] = {4, 2, 3}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 10) here; }
     rbb_free(bb);
 }
 
 static void test_EQ(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=EQ, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {42, 42};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, Tf) here;
+    { v8f reg[] = {42, 42}; rbb_eval_f(bb, reg); exact_f(reg[0].x, Tf) here; }
+    { v8h reg[] = {42, 42}; rbb_eval_h(bb, reg); exact_h(reg[0].x, Th) here; }
     rbb_free(bb);
 }
 
 static void test_GT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=GT, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {5, 3};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, Tf) here;
+    { v8f reg[] = {5, 3}; rbb_eval_f(bb, reg); exact_f(reg[0].x, Tf) here; }
+    { v8h reg[] = {5, 3}; rbb_eval_h(bb, reg); exact_h(reg[0].x, Th) here; }
     rbb_free(bb);
 }
 
 static void test_GE(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=GE, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {5, 5};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, Tf) here;
+    { v8f reg[] = {5, 5}; rbb_eval_f(bb, reg); exact_f(reg[0].x, Tf) here; }
+    { v8h reg[] = {5, 5}; rbb_eval_h(bb, reg); exact_h(reg[0].x, Th) here; }
     rbb_free(bb);
 }
 
 static void test_AND(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=AND, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {Tf, 0};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 0) here;
+    { v8f reg[] = {Tf, 0}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 0) here; }
+    { v8h reg[] = {Th, 0}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 0) here; }
     rbb_free(bb);
 }
 
 static void test_OR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=OR, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {Tf, 0};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, Tf) here;
+    { v8f reg[] = {Tf, 0}; rbb_eval_f(bb, reg); exact_f(reg[0].x, Tf) here; }
+    { v8h reg[] = {Th, 0}; rbb_eval_h(bb, reg); exact_h(reg[0].x, Th) here; }
     rbb_free(bb);
 }
 
 static void test_XOR(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=XOR, .d=0, .x=0, .y=1}, 1);
-    v8f reg[] = {Tf, Tf};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 0) here;
+    { v8f reg[] = {Tf, Tf}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 0) here; }
+    { v8h reg[] = {Th, Th}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 0) here; }
     rbb_free(bb);
 }
 
 static void test_NOT(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=NOT, .d=0, .x=0}, 1);
-    v8f reg[] = {0};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, Tf) here;
+    { v8f reg[] = {0}; rbb_eval_f(bb, reg); exact_f(reg[0].x, Tf) here; }
+    { v8h reg[] = {0}; rbb_eval_h(bb, reg); exact_h(reg[0].x, Th) here; }
     rbb_free(bb);
 }
 
 static void test_SEL(void) {
-    // SEL d = d ? x : y :  reg[0] = reg[0] ? reg[1] : reg[2] = Tf ? 1 : 2 = 1.
     struct rbb *bb = rbb(&(struct rbb_inst){.op=SEL, .d=0, .x=1, .y=2}, 1);
-    v8f reg[] = {Tf, 1, 2};
-    rbb_eval_f(bb, reg);
-    exact_f(reg[0].x, 1) here;
+    { v8f reg[] = {Tf, 1, 2}; rbb_eval_f(bb, reg); exact_f(reg[0].x, 1) here; }
+    { v8h reg[] = {Th, 1, 2}; rbb_eval_h(bb, reg); exact_h(reg[0].x, 1) here; }
     rbb_free(bb);
 }
 
 static void test_CALL(void) {
     struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
     struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
-
-    v8f reg[] = {21};
-    rbb_eval_f(caller, reg);
-    exact_f(reg[0].x, 42) here;
-
+    { v8f reg[] = {21}; rbb_eval_f(caller, reg); exact_f(reg[0].x, 42) here; }
+    { v8h reg[] = {21}; rbb_eval_h(caller, reg); exact_h(reg[0].x, 42) here; }
     rbb_free(caller);
     rbb_free(callee);
 }
@@ -227,11 +195,8 @@ static void test_CALL(void) {
 static void test_CALL_two_args(void) {
     struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
     struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
-
-    v8f reg[] = {10, 32};
-    rbb_eval_f(caller, reg);
-    exact_f(reg[0].x, 42) here;
-
+    { v8f reg[] = {10, 32}; rbb_eval_f(caller, reg); exact_f(reg[0].x, 42) here; }
+    { v8h reg[] = {10, 32}; rbb_eval_h(caller, reg); exact_h(reg[0].x, 42) here; }
     rbb_free(caller);
     rbb_free(callee);
 }
@@ -242,11 +207,8 @@ static void test_CALL_then_op(void) {
         {.op=CALL, .d=0, .call=doubler},
         {.op=NEG,  .d=0, .x=0},
     }, 2);
-
-    v8f reg[] = {21};
-    rbb_eval_f(caller, reg);
-    exact_f(reg[0].x, -42) here;
-
+    { v8f reg[] = {21}; rbb_eval_f(caller, reg); exact_f(reg[0].x, -42) here; }
+    { v8h reg[] = {21}; rbb_eval_h(caller, reg); exact_h(reg[0].x, -42) here; }
     rbb_free(caller);
     rbb_free(doubler);
 }
@@ -299,318 +261,80 @@ static void test_regs_opaque(void) {
     rbb_free(bb);
 }
 
-static void test_IMM_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=3.5f}, 1);
-    v8h reg[] = {0};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)3.5) here;
-    rbb_free(bb);
-}
-
-static void test_NEG_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
-    v8h reg[] = {42};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)-42) here;
-    rbb_free(bb);
-}
-
-static void test_ABS_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ABS, .d=0, .x=0}, 1);
-    v8h reg[] = {-42};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)42) here;
-    rbb_free(bb);
-}
-
-static void test_SQRT_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=SQRT, .d=0, .x=0}, 1);
-    v8h reg[] = {49};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)7) here;
-    rbb_free(bb);
-}
-
-static void test_FLOOR_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=FLOOR, .d=0, .x=0}, 1);
-    v8h reg[] = {(_Float16)1.75};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)1) here;
-    rbb_free(bb);
-}
-
-static void test_CEIL_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=CEIL, .d=0, .x=0}, 1);
-    v8h reg[] = {(_Float16)1.25};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)2) here;
-    rbb_free(bb);
-}
-
-static void test_TRUNC_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=TRUNC, .d=0, .x=0}, 1);
-    v8h reg[] = {(_Float16)-1.75};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)-1) here;
-    rbb_free(bb);
-}
-
-static void test_ROUND_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ROUND, .d=0, .x=0}, 1);
-    v8h reg[] = {(_Float16)1.5};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)2) here;
-    rbb_free(bb);
-}
-
-static void test_ADD_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {42, 47};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)89) here;
-    rbb_free(bb);
-}
-
-static void test_SUB_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=SUB, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {47, 42};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)5) here;
-    rbb_free(bb);
-}
-
-static void test_MUL_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=MUL, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {6, 7};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)42) here;
-    rbb_free(bb);
-}
-
-static void test_DIV_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=DIV, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {84, 2};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)42) here;
-    rbb_free(bb);
-}
-
-static void test_MIN_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=MIN, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {3, 5};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)3) here;
-    rbb_free(bb);
-}
-
-static void test_MAX_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=MAX, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {3, 5};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)5) here;
-    rbb_free(bb);
-}
-
-static void test_FMA_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=FMA, .d=0, .x=1, .y=2}, 1);
-    v8h reg[] = {4, 2, 3};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)10) here;
-    rbb_free(bb);
-}
-
-static void test_EQ_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=EQ, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {42, 42};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], Th) here;
-    rbb_free(bb);
-}
-
-static void test_GT_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=GT, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {5, 3};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], Th) here;
-    rbb_free(bb);
-}
-
-static void test_GE_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=GE, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {5, 5};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], Th) here;
-    rbb_free(bb);
-}
-
-static void test_AND_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=AND, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {Th, 0};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], 0) here;
-    rbb_free(bb);
-}
-
-static void test_OR_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=OR, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {Th, 0};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], Th) here;
-    rbb_free(bb);
-}
-
-static void test_XOR_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=XOR, .d=0, .x=0, .y=1}, 1);
-    v8h reg[] = {Th, Th};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], 0) here;
-    rbb_free(bb);
-}
-
-static void test_NOT_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=NOT, .d=0, .x=0}, 1);
-    v8h reg[] = {0};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], Th) here;
-    rbb_free(bb);
-}
-
-static void test_SEL_h(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=SEL, .d=0, .x=1, .y=2}, 1);
-    v8h reg[] = {Th, 1, 2};
-    rbb_eval_h(bb, reg);
-    exact_h(reg[0][0], (_Float16)1) here;
-    rbb_free(bb);
-}
-
-static void test_CALL_h(void) {
-    struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
-    struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
-
-    v8h reg[] = {21};
-    rbb_eval_h(caller, reg);
-    exact_h(reg[0][0], (_Float16)42) here;
-
-    rbb_free(caller);
-    rbb_free(callee);
-}
-
-static void test_CALL_two_args_h(void) {
-    struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
-
-    v8h reg[] = {10, 32};
-    rbb_eval_h(caller, reg);
-    exact_h(reg[0][0], (_Float16)42) here;
-
-    rbb_free(caller);
-    rbb_free(callee);
-}
-
-static void test_CALL_then_op_h(void) {
-    struct rbb *doubler = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
-    struct rbb *caller  = rbb((struct rbb_inst[]){
-        {.op=CALL, .d=0, .call=doubler},
-        {.op=NEG,  .d=0, .x=0},
-    }, 2);
-
-    v8h reg[] = {21};
-    rbb_eval_h(caller, reg);
-    exact_h(reg[0][0], (_Float16)-42) here;
-
-    rbb_free(caller);
-    rbb_free(doubler);
-}
-
-static void test_roundtrip_565_f(void) {
-    uint16_t dst[8] = {0}, src[] = {
+static void test_roundtrip_565(void) {
+    uint16_t src[] = {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
         0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
     };
-    struct cfg_load  ld = load_565(src);
-    struct cfg_store st = store_565(dst, &ld.cfg);
-    v8f reg[3];
-    cfg_eval_f(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    struct cfg_load ld = load_565(src);
+    struct cfg_store st = store_565(NULL, &ld.cfg);
+    {
+        uint16_t dst[8] = {0};
+        st.dst = dst;
+        v8f reg[3];
+        cfg_eval_f(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
-}
-static void test_roundtrip_565_h(void) {
-    uint16_t dst[8] = {0}, src[] = {
-        0x0000, 0xFFFF, 0x001F, 0x07E0,
-        0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
-    };
-    struct cfg_load  ld = load_565(src);
-    struct cfg_store st = store_565(dst, &ld.cfg);
-    v8h reg[3];
-    cfg_eval_h(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    {
+        uint16_t dst[8] = {0};
+        st.dst = dst;
+        v8h reg[3];
+        cfg_eval_h(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
 }
 
-static void test_roundtrip_8888_f(void) {
-    uint32_t dst[8] = {0}, src[] = {
+static void test_roundtrip_8888(void) {
+    uint32_t src[] = {
         0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
         0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
     };
-    struct cfg_load  ld = load_8888(src);
-    struct cfg_store st = store_8888(dst, &ld.cfg);
-    v8f reg[4];
-    cfg_eval_f(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    struct cfg_load ld = load_8888(src);
+    struct cfg_store st = store_8888(NULL, &ld.cfg);
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8f reg[4];
+        cfg_eval_f(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
-}
-static void test_roundtrip_8888_h(void) {
-    uint32_t dst[8] = {0}, src[] = {
-        0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
-        0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
-    };
-    struct cfg_load  ld = load_8888(src);
-    struct cfg_store st = store_8888(dst, &ld.cfg);
-    v8h reg[4];
-    cfg_eval_h(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8h reg[4];
+        cfg_eval_h(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
 }
 
-static void test_roundtrip_1010102_f(void) {
-    uint32_t dst[8] = {0}, src[] = {
+static void test_roundtrip_1010102(void) {
+    uint32_t src[] = {
         0x00000000, 0xFFFFFFFF,
         0x000003FF, 0x000FFC00,
         0x3FF00000, 0xC0000000,
         (512) | (512 << 10) | (512 << 20) | (2u << 30),
         (100) | (200 << 10) | (300 << 20) | (1u << 30),
     };
-    struct cfg_load  ld = load_1010102(src);
-    struct cfg_store st = store_1010102(dst, &ld.cfg);
-    v8f reg[4];
-    cfg_eval_f(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    struct cfg_load ld = load_1010102(src);
+    struct cfg_store st = store_1010102(NULL, &ld.cfg);
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8f reg[4];
+        cfg_eval_f(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
-}
-static void test_roundtrip_1010102_h(void) {
-    uint32_t dst[8] = {0}, src[] = {
-        0x00000000, 0xFFFFFFFF,
-        0x000003FF, 0x000FFC00,
-        0x3FF00000, 0xC0000000,
-        (512) | (512 << 10) | (512 << 20) | (2u << 30),
-        (100) | (200 << 10) | (300 << 20) | (1u << 30),
-    };
-    struct cfg_load  ld = load_1010102(src);
-    struct cfg_store st = store_1010102(dst, &ld.cfg);
-    v8h reg[4];
-    cfg_eval_h(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        dst[i] == src[i] here;
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8h reg[4];
+        cfg_eval_h(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == src[i] here; }
     }
 }
 
-static void test_roundtrip_fp16_f(void) {
-    v4h dst[8] = {0}, src[8];
+static void test_roundtrip_fp16(void) {
+    v4h src[8];
     for (int i = 0; i < 8; i++) {
         src[i] = (v4h){
             (_Float16)((float)(4*i+0) / 31.0f),
@@ -619,36 +343,31 @@ static void test_roundtrip_fp16_f(void) {
             (_Float16)((float)(4*i+3) / 31.0f),
         };
     }
-    struct cfg_load  ld = load_fp16(src);
-    struct cfg_store st = store_fp16(dst, &ld.cfg);
-    v8f reg[4];
-    cfg_eval_f(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        exact_h(dst[i][0], src[i][0]) here;
-        exact_h(dst[i][1], src[i][1]) here;
-        exact_h(dst[i][2], src[i][2]) here;
-        exact_h(dst[i][3], src[i][3]) here;
+    struct cfg_load ld = load_fp16(src);
+    struct cfg_store st = store_fp16(NULL, &ld.cfg);
+    {
+        v4h dst[8] = {0};
+        st.dst = dst;
+        v8f reg[4];
+        cfg_eval_f(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) {
+            exact_h(dst[i][0], src[i][0]) here;
+            exact_h(dst[i][1], src[i][1]) here;
+            exact_h(dst[i][2], src[i][2]) here;
+            exact_h(dst[i][3], src[i][3]) here;
+        }
     }
-}
-static void test_roundtrip_fp16_h(void) {
-    v4h dst[8] = {0}, src[8];
-    for (int i = 0; i < 8; i++) {
-        src[i] = (v4h){
-            (_Float16)((float)(4*i+0) / 31.0f),
-            (_Float16)((float)(4*i+1) / 31.0f),
-            (_Float16)((float)(4*i+2) / 31.0f),
-            (_Float16)((float)(4*i+3) / 31.0f),
-        };
-    }
-    struct cfg_load  ld = load_fp16(src);
-    struct cfg_store st = store_fp16(dst, &ld.cfg);
-    v8h reg[4];
-    cfg_eval_h(&st.cfg, reg);
-    for (int i = 0; i < 8; i++) {
-        exact_h(dst[i][0], src[i][0]) here;
-        exact_h(dst[i][1], src[i][1]) here;
-        exact_h(dst[i][2], src[i][2]) here;
-        exact_h(dst[i][3], src[i][3]) here;
+    {
+        v4h dst[8] = {0};
+        st.dst = dst;
+        v8h reg[4];
+        cfg_eval_h(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) {
+            exact_h(dst[i][0], src[i][0]) here;
+            exact_h(dst[i][1], src[i][1]) here;
+            exact_h(dst[i][2], src[i][2]) here;
+            exact_h(dst[i][3], src[i][3]) here;
+        }
     }
 }
 
@@ -688,40 +407,9 @@ int main(void) {
     test_regs_CALL();
     test_regs_opaque();
 
-    test_IMM_h();
-    test_NEG_h();
-    test_ABS_h();
-    test_SQRT_h();
-    test_FLOOR_h();
-    test_CEIL_h();
-    test_TRUNC_h();
-    test_ROUND_h();
-    test_ADD_h();
-    test_SUB_h();
-    test_MUL_h();
-    test_DIV_h();
-    test_MIN_h();
-    test_MAX_h();
-    test_FMA_h();
-    test_EQ_h();
-    test_GT_h();
-    test_GE_h();
-    test_AND_h();
-    test_OR_h();
-    test_XOR_h();
-    test_NOT_h();
-    test_SEL_h();
-    test_CALL_h();
-    test_CALL_two_args_h();
-    test_CALL_then_op_h();
-
-    test_roundtrip_565_f();
-    test_roundtrip_565_h();
-    test_roundtrip_8888_f();
-    test_roundtrip_8888_h();
-    test_roundtrip_1010102_f();
-    test_roundtrip_1010102_h();
-    test_roundtrip_fp16_f();
-    test_roundtrip_fp16_h();
+    test_roundtrip_565();
+    test_roundtrip_8888();
+    test_roundtrip_1010102();
+    test_roundtrip_fp16();
     return 0;
 }
