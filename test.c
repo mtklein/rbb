@@ -560,30 +560,26 @@ static void test_roundtrip_565_f(void) {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
         0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
     };
-    struct cfg *ld = load_565(src),
-               *st = store_565(dst, ld);
+    struct cfg *st = store_565(dst, load_565(src));
     v8f reg[3];
     st->eval_f(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_565_h(void) {
     uint16_t dst[8] = {0}, src[] = {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
         0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
     };
-    struct cfg *ld = load_565(src),
-               *st = store_565(dst, ld);
+    struct cfg *st = store_565(dst, load_565(src));
     v8h reg[3];
     st->eval_h(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_8888_f(void) {
@@ -591,30 +587,26 @@ static void test_roundtrip_8888_f(void) {
         0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
         0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
     };
-    struct cfg *ld = load_8888(src),
-               *st = store_8888(dst, ld);
+    struct cfg *st = store_8888(dst, load_8888(src));
     v8f reg[4];
     st->eval_f(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_8888_h(void) {
     uint32_t dst[8] = {0}, src[] = {
         0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
         0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
     };
-    struct cfg *ld = load_8888(src),
-               *st = store_8888(dst, ld);
+    struct cfg *st = store_8888(dst, load_8888(src));
     v8h reg[4];
     st->eval_h(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_1010102_f(void) {
@@ -625,15 +617,13 @@ static void test_roundtrip_1010102_f(void) {
         (512) | (512 << 10) | (512 << 20) | (2u << 30),
         (100) | (200 << 10) | (300 << 20) | (1u << 30),
     };
-    struct cfg *ld = load_1010102(src),
-               *st = store_1010102(dst, ld);
+    struct cfg *st = store_1010102(dst, load_1010102(src));
     v8f reg[4];
     st->eval_f(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_1010102_h(void) {
     uint32_t dst[8] = {0}, src[] = {
@@ -643,15 +633,13 @@ static void test_roundtrip_1010102_h(void) {
         (512) | (512 << 10) | (512 << 20) | (2u << 30),
         (100) | (200 << 10) | (300 << 20) | (1u << 30),
     };
-    struct cfg *ld = load_1010102(src),
-               *st = store_1010102(dst, ld);
+    struct cfg *st = store_1010102(dst, load_1010102(src));
     v8h reg[4];
     st->eval_h(st, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_fp16_f(void) {
@@ -662,8 +650,7 @@ static void test_roundtrip_fp16_f(void) {
         src[i].b = (_Float16)((float)(4*i+2) / 31.0f);
         src[i].a = (_Float16)((float)(4*i+3) / 31.0f);
     }
-    struct cfg *ld = load_fp16(src),
-               *st = store_fp16(dst, ld);
+    struct cfg *st = store_fp16(dst, load_fp16(src));
     v8f reg[4];
     st->eval_f(st, reg);
     for (int i = 0; i < 8; i++) {
@@ -673,7 +660,6 @@ static void test_roundtrip_fp16_f(void) {
         exact_h(dst[i].a, src[i].a) here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_fp16_h(void) {
     struct rgba_fp16 dst[8] = {0}, src[8];
@@ -683,8 +669,7 @@ static void test_roundtrip_fp16_h(void) {
         src[i].b = (_Float16)((float)(4*i+2) / 31.0f);
         src[i].a = (_Float16)((float)(4*i+3) / 31.0f);
     }
-    struct cfg *ld = load_fp16(src),
-               *st = store_fp16(dst, ld);
+    struct cfg *st = store_fp16(dst, load_fp16(src));
     v8h reg[4];
     st->eval_h(st, reg);
     for (int i = 0; i < 8; i++) {
@@ -694,7 +679,6 @@ static void test_roundtrip_fp16_h(void) {
         exact_h(dst[i].a, src[i].a) here;
     }
     cfg_free(st);
-    cfg_free(ld);
 }
 
 int main(void) {

@@ -995,10 +995,15 @@ struct cfg* load_fp16(struct rgba_fp16 const *src) {
 }
 
 struct store_565 {
-    struct cfg        cfg;
-    uint16_t         *dst;
-    struct cfg const *rgb;
+    struct cfg  cfg;
+    uint16_t   *dst;
+    struct cfg *rgb;
 };
+static void store_565_free(struct cfg *cfg) {
+    struct store_565 *n = (struct store_565*)cfg;
+    n->rgb->free(n->rgb);
+    free(n);
+}
 static void store_565_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct store_565 const *n = (struct store_565 const*)cfg;
     n->rgb->eval_f(n->rgb, reg);
@@ -1017,10 +1022,10 @@ static void store_565_eval_h(struct cfg const *cfg, v8h reg[]) {
     v8s const px = (R << 11) | (G << 5) | B;
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_565(uint16_t *dst, struct cfg const *rgb) {
+struct cfg* store_565(uint16_t *dst, struct cfg *rgb) {
     struct store_565 *n = malloc(sizeof *n);
     n->cfg = (struct cfg) {
-        .free   = just_free,
+        .free   = store_565_free,
         .eval_f = store_565_eval_f,
         .eval_h = store_565_eval_h,
     };
@@ -1030,10 +1035,15 @@ struct cfg* store_565(uint16_t *dst, struct cfg const *rgb) {
 }
 
 struct store_8888 {
-    struct cfg        cfg;
-    uint32_t         *dst;
-    struct cfg const *rgba;
+    struct cfg  cfg;
+    uint32_t   *dst;
+    struct cfg *rgba;
 };
+static void store_8888_free(struct cfg *cfg) {
+    struct store_8888 *n = (struct store_8888*)cfg;
+    n->rgba->free(n->rgba);
+    free(n);
+}
 static void store_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct store_8888 const *n = (struct store_8888 const*)cfg;
     n->rgba->eval_f(n->rgba, reg);
@@ -1057,10 +1067,10 @@ static void store_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
                  | (__builtin_convertvector(A, v8i) << 24);
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_8888(uint32_t *dst, struct cfg const *rgba) {
+struct cfg* store_8888(uint32_t *dst, struct cfg *rgba) {
     struct store_8888 *n = malloc(sizeof *n);
     n->cfg = (struct cfg) {
-        .free   = just_free,
+        .free   = store_8888_free,
         .eval_f = store_8888_eval_f,
         .eval_h = store_8888_eval_h,
     };
@@ -1070,10 +1080,15 @@ struct cfg* store_8888(uint32_t *dst, struct cfg const *rgba) {
 }
 
 struct store_1010102 {
-    struct cfg        cfg;
-    uint32_t         *dst;
-    struct cfg const *rgba;
+    struct cfg  cfg;
+    uint32_t   *dst;
+    struct cfg *rgba;
 };
+static void store_1010102_free(struct cfg *cfg) {
+    struct store_1010102 *n = (struct store_1010102*)cfg;
+    n->rgba->free(n->rgba);
+    free(n);
+}
 static void store_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct store_1010102 const *n = (struct store_1010102 const*)cfg;
     n->rgba->eval_f(n->rgba, reg);
@@ -1094,10 +1109,10 @@ static void store_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
     v8i const px = R | (G << 10) | (B << 20) | (A << 30);
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_1010102(uint32_t *dst, struct cfg const *rgba) {
+struct cfg* store_1010102(uint32_t *dst, struct cfg *rgba) {
     struct store_1010102 *n = malloc(sizeof *n);
     n->cfg = (struct cfg) {
-        .free   = just_free,
+        .free   = store_1010102_free,
         .eval_f = store_1010102_eval_f,
         .eval_h = store_1010102_eval_h,
     };
@@ -1109,8 +1124,13 @@ struct cfg* store_1010102(uint32_t *dst, struct cfg const *rgba) {
 struct store_fp16 {
     struct cfg        cfg;
     struct rgba_fp16 *dst;
-    struct cfg const *rgba;
+    struct cfg       *rgba;
 };
+static void store_fp16_free(struct cfg *cfg) {
+    struct store_fp16 *n = (struct store_fp16*)cfg;
+    n->rgba->free(n->rgba);
+    free(n);
+}
 static void store_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct store_fp16 const *n = (struct store_fp16 const*)cfg;
     n->rgba->eval_f(n->rgba, reg);
@@ -1131,10 +1151,10 @@ static void store_fp16_eval_h(struct cfg const *cfg, v8h reg[]) {
         n->dst[i].a = reg[3][i];
     }
 }
-struct cfg* store_fp16(struct rgba_fp16 *dst, struct cfg const *rgba) {
+struct cfg* store_fp16(struct rgba_fp16 *dst, struct cfg *rgba) {
     struct store_fp16 *n = malloc(sizeof *n);
     n->cfg = (struct cfg) {
-        .free   = just_free,
+        .free   = store_fp16_free,
         .eval_f = store_fp16_eval_f,
         .eval_h = store_fp16_eval_h,
     };
