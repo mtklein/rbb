@@ -3,10 +3,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef float    v8f __attribute__((ext_vector_type(8)));
+typedef _Float16 v4h __attribute__((ext_vector_type(4)));
 typedef _Float16 v8h __attribute__((ext_vector_type(8)));
-typedef int      v8i __attribute__((ext_vector_type(8)));
+typedef float    v8f __attribute__((ext_vector_type(8)));
 typedef short    v8s __attribute__((ext_vector_type(8)));
+typedef int      v8i __attribute__((ext_vector_type(8)));
 
 enum rbb_op {
     IMM, CALL,
@@ -34,22 +35,25 @@ void            rbb_eval_h(struct rbb const*, v8h reg[]);
 void            rbb_free(struct rbb*);
 
 struct cfg {
-    void (*free)(struct cfg*);
     void (*eval_f)(struct cfg const*, v8f reg[]);
     void (*eval_h)(struct cfg const*, v8h reg[]);
 };
-void cfg_free(struct cfg*);
 
-struct rgba_fp16 {
-    _Float16 r,g,b,a;
+struct cfg_load {
+    struct cfg  cfg;
+    void const *src;
 };
+struct cfg_load load_565    (uint16_t const*);
+struct cfg_load load_8888   (uint32_t const*);
+struct cfg_load load_1010102(uint32_t const*);
+struct cfg_load load_fp16   (v4h      const*);
 
-struct cfg* load_565    (        uint16_t const*);
-struct cfg* load_8888   (        uint32_t const*);
-struct cfg* load_1010102(        uint32_t const*);
-struct cfg* load_fp16   (struct rgba_fp16 const*);
-
-struct cfg* store_565    (        uint16_t*, struct cfg const *rgb);
-struct cfg* store_8888   (        uint32_t*, struct cfg const *rgba);
-struct cfg* store_1010102(        uint32_t*, struct cfg const *rgba);
-struct cfg* store_fp16   (struct rgba_fp16*, struct cfg const *rgba);
+struct cfg_store {
+    struct cfg        cfg;
+    void             *dst;
+    struct cfg const *input;
+};
+struct cfg_store store_565    (uint16_t*, struct cfg const *rgb);
+struct cfg_store store_8888   (uint32_t*, struct cfg const *rgba);
+struct cfg_store store_1010102(uint32_t*, struct cfg const *rgba);
+struct cfg_store store_fp16   (     v4h*, struct cfg const *rgba);

@@ -560,30 +560,26 @@ static void test_roundtrip_565_f(void) {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
         0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
     };
-    struct cfg *ld = load_565(src),
-               *st = store_565(dst, ld);
+    struct cfg_load  ld = load_565(src);
+    struct cfg_store st = store_565(dst, &ld.cfg);
     v8f reg[3];
-    st->eval_f(st, reg);
+    st.cfg.eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_565_h(void) {
     uint16_t dst[8] = {0}, src[] = {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
         0xF800, 0x07FF, 0xFFFF, (16<<11)|(32<<5)|16,
     };
-    struct cfg *ld = load_565(src),
-               *st = store_565(dst, ld);
+    struct cfg_load  ld = load_565(src);
+    struct cfg_store st = store_565(dst, &ld.cfg);
     v8h reg[3];
-    st->eval_h(st, reg);
+    st.cfg.eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_8888_f(void) {
@@ -591,30 +587,26 @@ static void test_roundtrip_8888_f(void) {
         0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
         0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
     };
-    struct cfg *ld = load_8888(src),
-               *st = store_8888(dst, ld);
+    struct cfg_load  ld = load_8888(src);
+    struct cfg_store st = store_8888(dst, &ld.cfg);
     v8f reg[4];
-    st->eval_f(st, reg);
+    st.cfg.eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_8888_h(void) {
     uint32_t dst[8] = {0}, src[] = {
         0x00000000, 0xFFFFFFFF, 0x000000FF, 0x0000FF00,
         0x00FF0000, 0xFF000000, 0x80402010, 0xC0C0C0C0,
     };
-    struct cfg *ld = load_8888(src),
-               *st = store_8888(dst, ld);
+    struct cfg_load  ld = load_8888(src);
+    struct cfg_store st = store_8888(dst, &ld.cfg);
     v8h reg[4];
-    st->eval_h(st, reg);
+    st.cfg.eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_1010102_f(void) {
@@ -625,15 +617,13 @@ static void test_roundtrip_1010102_f(void) {
         (512) | (512 << 10) | (512 << 20) | (2u << 30),
         (100) | (200 << 10) | (300 << 20) | (1u << 30),
     };
-    struct cfg *ld = load_1010102(src),
-               *st = store_1010102(dst, ld);
+    struct cfg_load  ld = load_1010102(src);
+    struct cfg_store st = store_1010102(dst, &ld.cfg);
     v8f reg[4];
-    st->eval_f(st, reg);
+    st.cfg.eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_1010102_h(void) {
     uint32_t dst[8] = {0}, src[] = {
@@ -643,58 +633,56 @@ static void test_roundtrip_1010102_h(void) {
         (512) | (512 << 10) | (512 << 20) | (2u << 30),
         (100) | (200 << 10) | (300 << 20) | (1u << 30),
     };
-    struct cfg *ld = load_1010102(src),
-               *st = store_1010102(dst, ld);
+    struct cfg_load  ld = load_1010102(src);
+    struct cfg_store st = store_1010102(dst, &ld.cfg);
     v8h reg[4];
-    st->eval_h(st, reg);
+    st.cfg.eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 
 static void test_roundtrip_fp16_f(void) {
-    struct rgba_fp16 dst[8] = {0}, src[8];
+    v4h dst[8] = {0}, src[8];
     for (int i = 0; i < 8; i++) {
-        src[i].r = (_Float16)((float)(4*i+0) / 31.0f);
-        src[i].g = (_Float16)((float)(4*i+1) / 31.0f);
-        src[i].b = (_Float16)((float)(4*i+2) / 31.0f);
-        src[i].a = (_Float16)((float)(4*i+3) / 31.0f);
+        src[i] = (v4h){
+            (_Float16)((float)(4*i+0) / 31.0f),
+            (_Float16)((float)(4*i+1) / 31.0f),
+            (_Float16)((float)(4*i+2) / 31.0f),
+            (_Float16)((float)(4*i+3) / 31.0f),
+        };
     }
-    struct cfg *ld = load_fp16(src),
-               *st = store_fp16(dst, ld);
+    struct cfg_load  ld = load_fp16(src);
+    struct cfg_store st = store_fp16(dst, &ld.cfg);
     v8f reg[4];
-    st->eval_f(st, reg);
+    st.cfg.eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
-        exact_h(dst[i].r, src[i].r) here;
-        exact_h(dst[i].g, src[i].g) here;
-        exact_h(dst[i].b, src[i].b) here;
-        exact_h(dst[i].a, src[i].a) here;
+        exact_h(dst[i][0], src[i][0]) here;
+        exact_h(dst[i][1], src[i][1]) here;
+        exact_h(dst[i][2], src[i][2]) here;
+        exact_h(dst[i][3], src[i][3]) here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 static void test_roundtrip_fp16_h(void) {
-    struct rgba_fp16 dst[8] = {0}, src[8];
+    v4h dst[8] = {0}, src[8];
     for (int i = 0; i < 8; i++) {
-        src[i].r = (_Float16)((float)(4*i+0) / 31.0f);
-        src[i].g = (_Float16)((float)(4*i+1) / 31.0f);
-        src[i].b = (_Float16)((float)(4*i+2) / 31.0f);
-        src[i].a = (_Float16)((float)(4*i+3) / 31.0f);
+        src[i] = (v4h){
+            (_Float16)((float)(4*i+0) / 31.0f),
+            (_Float16)((float)(4*i+1) / 31.0f),
+            (_Float16)((float)(4*i+2) / 31.0f),
+            (_Float16)((float)(4*i+3) / 31.0f),
+        };
     }
-    struct cfg *ld = load_fp16(src),
-               *st = store_fp16(dst, ld);
+    struct cfg_load  ld = load_fp16(src);
+    struct cfg_store st = store_fp16(dst, &ld.cfg);
     v8h reg[4];
-    st->eval_h(st, reg);
+    st.cfg.eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
-        exact_h(dst[i].r, src[i].r) here;
-        exact_h(dst[i].g, src[i].g) here;
-        exact_h(dst[i].b, src[i].b) here;
-        exact_h(dst[i].a, src[i].a) here;
+        exact_h(dst[i][0], src[i][0]) here;
+        exact_h(dst[i][1], src[i][1]) here;
+        exact_h(dst[i][2], src[i][2]) here;
+        exact_h(dst[i][3], src[i][3]) here;
     }
-    cfg_free(st);
-    cfg_free(ld);
 }
 
 int main(void) {

@@ -853,22 +853,8 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
     }
 }
 
-void cfg_free(struct cfg *cfg) {
-    if (cfg) {
-        cfg->free(cfg);
-    }
-}
-
-static void just_free(struct cfg *cfg) {
-    free(cfg);
-}
-
-struct load_565 {
-    struct cfg      cfg;
-    uint16_t const *src;
-};
 static void load_565_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct load_565 const *n = (struct load_565 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8s px;
     __builtin_memcpy(&px, n->src, sizeof px);
     v8i const wide = __builtin_convertvector(px, v8i);
@@ -877,30 +863,22 @@ static void load_565_eval_f(struct cfg const *cfg, v8f reg[]) {
     reg[2] = __builtin_convertvector((wide      ) & 31, v8f) * (1/31.0f);
 }
 static void load_565_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct load_565 const *n = (struct load_565 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8s px;
     __builtin_memcpy(&px, n->src, sizeof px);
     reg[0] = __builtin_convertvector((px >> 11) & 31, v8h) * (_Float16)(1/31.0f);
     reg[1] = __builtin_convertvector((px >>  5) & 63, v8h) * (_Float16)(1/63.0f);
     reg[2] = __builtin_convertvector((px      ) & 31, v8h) * (_Float16)(1/31.0f);
 }
-struct cfg* load_565(uint16_t const *src) {
-    struct load_565 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = load_565_eval_f,
-        .eval_h = load_565_eval_h,
+struct cfg_load load_565(uint16_t const *src) {
+    return (struct cfg_load) {
+        .cfg = { .eval_f = load_565_eval_f, .eval_h = load_565_eval_h },
+        .src = src,
     };
-    n->src = src;
-    return &n->cfg;
 }
 
-struct load_8888 {
-    struct cfg      cfg;
-    uint32_t const *src;
-};
 static void load_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct load_8888 const *n = (struct load_8888 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8i px;
     __builtin_memcpy(&px, n->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 255, v8f) * (1/255.0f);
@@ -909,7 +887,7 @@ static void load_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
     reg[3] = __builtin_convertvector((px >> 24) & 255, v8f) * (1/255.0f);
 }
 static void load_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct load_8888 const *n = (struct load_8888 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8i px;
     __builtin_memcpy(&px, n->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 255, v8h) * (_Float16)(1/255.0f);
@@ -917,23 +895,15 @@ static void load_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
     reg[2] = __builtin_convertvector((px >> 16) & 255, v8h) * (_Float16)(1/255.0f);
     reg[3] = __builtin_convertvector((px >> 24) & 255, v8h) * (_Float16)(1/255.0f);
 }
-struct cfg* load_8888(uint32_t const *src) {
-    struct load_8888 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = load_8888_eval_f,
-        .eval_h = load_8888_eval_h,
+struct cfg_load load_8888(uint32_t const *src) {
+    return (struct cfg_load) {
+        .cfg = { .eval_f = load_8888_eval_f, .eval_h = load_8888_eval_h },
+        .src = src,
     };
-    n->src = src;
-    return &n->cfg;
 }
 
-struct load_1010102 {
-    struct cfg      cfg;
-    uint32_t const *src;
-};
 static void load_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct load_1010102 const *n = (struct load_1010102 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8i px;
     __builtin_memcpy(&px, n->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 1023, v8f) * (1/1023.0f);
@@ -942,7 +912,7 @@ static void load_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
     reg[3] = __builtin_convertvector((px >> 30) &    3, v8f) * (1/3.0f);
 }
 static void load_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct load_1010102 const *n = (struct load_1010102 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
     v8i px;
     __builtin_memcpy(&px, n->src, sizeof px);
     reg[0] = __builtin_convertvector((px      ) & 1023, v8h) * (_Float16)(1/1023.0f);
@@ -950,58 +920,43 @@ static void load_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
     reg[2] = __builtin_convertvector((px >> 20) & 1023, v8h) * (_Float16)(1/1023.0f);
     reg[3] = __builtin_convertvector((px >> 30) &    3, v8h) * (_Float16)(1/3.0f);
 }
-struct cfg* load_1010102(uint32_t const *src) {
-    struct load_1010102 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = load_1010102_eval_f,
-        .eval_h = load_1010102_eval_h,
+struct cfg_load load_1010102(uint32_t const *src) {
+    return (struct cfg_load) {
+        .cfg = { .eval_f = load_1010102_eval_f, .eval_h = load_1010102_eval_h },
+        .src = src,
     };
-    n->src = src;
-    return &n->cfg;
 }
 
-struct load_fp16 {
-    struct cfg              cfg;
-    struct rgba_fp16 const *src;
-};
 static void load_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct load_fp16 const *n = (struct load_fp16 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    v4h const *src = n->src;
     for (int i = 0; i < 8; i++) {
-        reg[0][i] = (float)n->src[i].r;
-        reg[1][i] = (float)n->src[i].g;
-        reg[2][i] = (float)n->src[i].b;
-        reg[3][i] = (float)n->src[i].a;
+        reg[0][i] = (float)src[i].r;
+        reg[1][i] = (float)src[i].g;
+        reg[2][i] = (float)src[i].b;
+        reg[3][i] = (float)src[i].a;
     }
 }
 static void load_fp16_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct load_fp16 const *n = (struct load_fp16 const*)cfg;
+    struct cfg_load const *n = (struct cfg_load const*)cfg;
+    v4h const *src = n->src;
     for (int i = 0; i < 8; i++) {
-        reg[0][i] = n->src[i].r;
-        reg[1][i] = n->src[i].g;
-        reg[2][i] = n->src[i].b;
-        reg[3][i] = n->src[i].a;
+        reg[0][i] = src[i].r;
+        reg[1][i] = src[i].g;
+        reg[2][i] = src[i].b;
+        reg[3][i] = src[i].a;
     }
 }
-struct cfg* load_fp16(struct rgba_fp16 const *src) {
-    struct load_fp16 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = load_fp16_eval_f,
-        .eval_h = load_fp16_eval_h,
+struct cfg_load load_fp16(v4h const *src) {
+    return (struct cfg_load) {
+        .cfg = { .eval_f = load_fp16_eval_f, .eval_h = load_fp16_eval_h },
+        .src = src,
     };
-    n->src = src;
-    return &n->cfg;
 }
 
-struct store_565 {
-    struct cfg        cfg;
-    uint16_t         *dst;
-    struct cfg const *rgb;
-};
 static void store_565_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct store_565 const *n = (struct store_565 const*)cfg;
-    n->rgb->eval_f(n->rgb, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_f(n->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 63 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 31 + 0.5, v8i);
@@ -1009,34 +964,25 @@ static void store_565_eval_f(struct cfg const *cfg, v8f reg[]) {
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
 static void store_565_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct store_565 const *n = (struct store_565 const*)cfg;
-    n->rgb->eval_h(n->rgb, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_h(n->input, reg);
     v8s const R = __builtin_convertvector(reg[0] * 31 + 0.5, v8s),
               G = __builtin_convertvector(reg[1] * 63 + 0.5, v8s),
               B = __builtin_convertvector(reg[2] * 31 + 0.5, v8s);
     v8s const px = (R << 11) | (G << 5) | B;
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_565(uint16_t *dst, struct cfg const *rgb) {
-    struct store_565 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = store_565_eval_f,
-        .eval_h = store_565_eval_h,
+struct cfg_store store_565(uint16_t *dst, struct cfg const *rgb) {
+    return (struct cfg_store) {
+        .cfg   = { .eval_f = store_565_eval_f, .eval_h = store_565_eval_h },
+        .dst   = dst,
+        .input = rgb,
     };
-    n->dst = dst;
-    n->rgb = rgb;
-    return &n->cfg;
 }
 
-struct store_8888 {
-    struct cfg        cfg;
-    uint32_t         *dst;
-    struct cfg const *rgba;
-};
 static void store_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct store_8888 const *n = (struct store_8888 const*)cfg;
-    n->rgba->eval_f(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_f(n->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 255 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 255 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 255 + 0.5, v8i),
@@ -1045,8 +991,8 @@ static void store_8888_eval_f(struct cfg const *cfg, v8f reg[]) {
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
 static void store_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct store_8888 const *n = (struct store_8888 const*)cfg;
-    n->rgba->eval_h(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_h(n->input, reg);
     v8s const R = __builtin_convertvector(reg[0] * 255 + 0.5, v8s),
               G = __builtin_convertvector(reg[1] * 255 + 0.5, v8s),
               B = __builtin_convertvector(reg[2] * 255 + 0.5, v8s),
@@ -1057,26 +1003,17 @@ static void store_8888_eval_h(struct cfg const *cfg, v8h reg[]) {
                  | (__builtin_convertvector(A, v8i) << 24);
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_8888(uint32_t *dst, struct cfg const *rgba) {
-    struct store_8888 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = store_8888_eval_f,
-        .eval_h = store_8888_eval_h,
+struct cfg_store store_8888(uint32_t *dst, struct cfg const *rgba) {
+    return (struct cfg_store) {
+        .cfg   = { .eval_f = store_8888_eval_f, .eval_h = store_8888_eval_h },
+        .dst   = dst,
+        .input = rgba,
     };
-    n->dst  = dst;
-    n->rgba = rgba;
-    return &n->cfg;
 }
 
-struct store_1010102 {
-    struct cfg        cfg;
-    uint32_t         *dst;
-    struct cfg const *rgba;
-};
 static void store_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct store_1010102 const *n = (struct store_1010102 const*)cfg;
-    n->rgba->eval_f(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_f(n->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 1023 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 1023 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 1023 + 0.5, v8i),
@@ -1085,8 +1022,8 @@ static void store_1010102_eval_f(struct cfg const *cfg, v8f reg[]) {
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
 static void store_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct store_1010102 const *n = (struct store_1010102 const*)cfg;
-    n->rgba->eval_h(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_h(n->input, reg);
     v8i const R = __builtin_convertvector(reg[0] * 1023 + 0.5, v8i),
               G = __builtin_convertvector(reg[1] * 1023 + 0.5, v8i),
               B = __builtin_convertvector(reg[2] * 1023 + 0.5, v8i),
@@ -1094,51 +1031,44 @@ static void store_1010102_eval_h(struct cfg const *cfg, v8h reg[]) {
     v8i const px = R | (G << 10) | (B << 20) | (A << 30);
     __builtin_memcpy(n->dst, &px, sizeof px);
 }
-struct cfg* store_1010102(uint32_t *dst, struct cfg const *rgba) {
-    struct store_1010102 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = store_1010102_eval_f,
-        .eval_h = store_1010102_eval_h,
+struct cfg_store store_1010102(uint32_t *dst, struct cfg const *rgba) {
+    return (struct cfg_store) {
+        .cfg   = { .eval_f = store_1010102_eval_f, .eval_h = store_1010102_eval_h },
+        .dst   = dst,
+        .input = rgba,
     };
-    n->dst  = dst;
-    n->rgba = rgba;
-    return &n->cfg;
 }
 
-struct store_fp16 {
-    struct cfg        cfg;
-    struct rgba_fp16 *dst;
-    struct cfg const *rgba;
-};
 static void store_fp16_eval_f(struct cfg const *cfg, v8f reg[]) {
-    struct store_fp16 const *n = (struct store_fp16 const*)cfg;
-    n->rgba->eval_f(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_f(n->input, reg);
+    v4h *dst = n->dst;
     for (int i = 0; i < 8; i++) {
-        n->dst[i].r = (_Float16)reg[0][i];
-        n->dst[i].g = (_Float16)reg[1][i];
-        n->dst[i].b = (_Float16)reg[2][i];
-        n->dst[i].a = (_Float16)reg[3][i];
+        dst[i] = (v4h){
+            (_Float16)reg[0][i],
+            (_Float16)reg[1][i],
+            (_Float16)reg[2][i],
+            (_Float16)reg[3][i],
+        };
     }
 }
 static void store_fp16_eval_h(struct cfg const *cfg, v8h reg[]) {
-    struct store_fp16 const *n = (struct store_fp16 const*)cfg;
-    n->rgba->eval_h(n->rgba, reg);
+    struct cfg_store const *n = (struct cfg_store const*)cfg;
+    n->input->eval_h(n->input, reg);
+    v4h *dst = n->dst;
     for (int i = 0; i < 8; i++) {
-        n->dst[i].r = reg[0][i];
-        n->dst[i].g = reg[1][i];
-        n->dst[i].b = reg[2][i];
-        n->dst[i].a = reg[3][i];
+        dst[i] = (v4h){
+            reg[0][i],
+            reg[1][i],
+            reg[2][i],
+            reg[3][i],
+        };
     }
 }
-struct cfg* store_fp16(struct rgba_fp16 *dst, struct cfg const *rgba) {
-    struct store_fp16 *n = malloc(sizeof *n);
-    n->cfg = (struct cfg) {
-        .free   = just_free,
-        .eval_f = store_fp16_eval_f,
-        .eval_h = store_fp16_eval_h,
+struct cfg_store store_fp16(v4h *dst, struct cfg const *rgba) {
+    return (struct cfg_store) {
+        .cfg   = { .eval_f = store_fp16_eval_f, .eval_h = store_fp16_eval_h },
+        .dst   = dst,
+        .input = rgba,
     };
-    n->dst  = dst;
-    n->rgba = rgba;
-    return &n->cfg;
 }
