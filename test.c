@@ -371,6 +371,32 @@ static void test_roundtrip_fp16(void) {
     }
 }
 
+static void test_opaque(void) {
+    uint32_t src[] = {
+        0x00000000, 0x00FFFFFF, 0x000000FF, 0x0000FF00,
+        0x00FF0000, 0x00010203, 0x80402010, 0x00C0C0C0,
+    };
+    struct rbb *opaque = rbb(&(struct rbb_inst){.op=IMM, .d=3, .imm=1.0f}, 1);
+    struct cfg_load  ld  = load_8888(src);
+    struct cfg_rbb   rbb = cfg_rbb(opaque, &ld.cfg);
+    struct cfg_store st  = store_8888(NULL, &rbb.cfg);
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8f reg[4];
+        cfg_eval_f(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == (src[i] | 0xFF000000) here; }
+    }
+    {
+        uint32_t dst[8] = {0};
+        st.dst = dst;
+        v8h reg[4];
+        cfg_eval_h(&st.cfg, reg);
+        for (int i = 0; i < 8; i++) { dst[i] == (src[i] | 0xFF000000) here; }
+    }
+    rbb_free(opaque);
+}
+
 int main(void) {
     test_IMM();
     test_NEG();
@@ -406,6 +432,8 @@ int main(void) {
     test_regs_gap();
     test_regs_CALL();
     test_regs_opaque();
+
+    test_opaque();
 
     test_roundtrip_565();
     test_roundtrip_8888();
