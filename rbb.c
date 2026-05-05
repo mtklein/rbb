@@ -4,7 +4,7 @@
 #include <sys/mman.h>
 
 struct rbb {
-    int             insts,in,out,regs;
+    int             insts,regs;
     void           *jit_trampoline_f8;
     void           *jit_kernel_f8;
     size_t          jit_size_f8;
@@ -35,7 +35,7 @@ static size_t jit_inst_size_f8(struct rbb_inst const *ip) {
         int const save_count = d < callee->regs ? d : callee->regs;
         size_t bytes = 12;
         if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
-        if (d          > 0) { bytes += (size_t)(8*(callee->in + callee->out)); }
+        if (d          > 0) { bytes += (size_t)(8*(2*callee->regs)); }
         return bytes;
     }
     return ip->op == IMM ? 16 : 8;
@@ -48,7 +48,7 @@ static size_t jit_inst_size_h8(struct rbb_inst const *ip) {
         int const save_count = d < callee->regs ? d : callee->regs;
         size_t bytes = 12;
         if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
-        if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
+        if (d          > 0) { bytes += (size_t)(4*(2*callee->regs)); }
         return bytes;
     }
     return ip->op == IMM ? 8 : 4;
@@ -61,7 +61,7 @@ static size_t jit_inst_size_f4(struct rbb_inst const *ip) {
         int const save_count = d < callee->regs ? d : callee->regs;
         size_t bytes = 12;
         if (save_count > 0) { bytes += (size_t)(8 + 8*save_count); }
-        if (d          > 0) { bytes += (size_t)(4*(callee->in + callee->out)); }
+        if (d          > 0) { bytes += (size_t)(4*(2*callee->regs)); }
         return bytes;
     }
     return ip->op == IMM ? 12 : 4;
@@ -239,13 +239,13 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
     uint32_t *out = buf_words;
 
     int const save_pairs = callee_saves_f8(bb->regs);
-    size_t const trampoline_size = 4 * (size_t)(2*save_pairs + bb->in + bb->out + 4);
+    size_t const trampoline_size = 4 * (size_t)(2*save_pairs + 2*bb->regs + 4);
 
     *out++ = ENC_PUSH_FP_LR;
     for (int k = 0; k < save_pairs; k++) {
         *out++ = enc_STP_D_pre(2*k+8, 2*k+9, SP, -16);
     }
-    for (int r = 0; r < bb->in; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_LDP_Q(2*r, 2*r+1, X0, 32*r);
     }
     {
@@ -253,7 +253,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
         ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
         *out++ = enc_BL((int)(target_word - bl_word));
     }
-    for (int r = 0; r < bb->out; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_STP_Q(2*r, 2*r+1, X0, 32*r);
     }
     for (int k = save_pairs; k --> 0;) {
@@ -295,8 +295,6 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
             case CALL: {
                 struct rbb const *callee = ip->call;
                 int const cregs = callee->regs;
-                int const cin   = callee->in;
-                int const cout  = callee->out;
                 int const d     = ip->d;
                 int const save_count = d < cregs ? d : cregs;
 
@@ -308,8 +306,8 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
                         *out++ = enc_STP_Q(2*r, 2*r+1, SP, 32*r);
                     }
                 }
-                // Shift inputs into V[0..2*cin-1] (no-ops when d==0; skip emission).
-                for (int j = 0; j < cin && d > 0; j++) {
+                // Shift inputs into V[0..2*cregs-1] (no-ops when d==0; skip emission).
+                for (int j = 0; j < cregs && d > 0; j++) {
                     *out++ = enc_three_reg(enc_op_f[OR], 2*j,   2*(d+j),   2*(d+j));
                     *out++ = enc_three_reg(enc_op_f[OR], 2*j+1, 2*(d+j)+1, 2*(d+j)+1);
                 }
@@ -326,7 +324,7 @@ static size_t emit_jit_f8(struct rbb const *bb, void *buf, _Bool const kernel_is
                     *out++ = enc_BLR    (X16);
                 }
                 // Shift outputs out (reverse order safe; no-ops when d==0).
-                for (int j = cout; j --> 0 && d > 0;) {
+                for (int j = cregs; j --> 0 && d > 0;) {
                     *out++ = enc_three_reg(enc_op_f[OR], 2*(d+j),   2*j,   2*j);
                     *out++ = enc_three_reg(enc_op_f[OR], 2*(d+j)+1, 2*j+1, 2*j+1);
                 }
@@ -355,13 +353,13 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
     uint32_t *out = buf_words;
 
     int const saves = callee_saves_1q(bb->regs);
-    size_t const trampoline_size = 4 * (size_t)(2*saves + bb->in + bb->out + 4);
+    size_t const trampoline_size = 4 * (size_t)(2*saves + 2*bb->regs + 4);
 
     *out++ = ENC_PUSH_FP_LR;
     for (int k = 0; k < saves; k++) {
         *out++ = enc_STP_D_pre(2*k+8, 2*k+9, SP, -16);
     }
-    for (int r = 0; r < bb->in; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_LDR_Q(r, X0, 16*r);
     }
     {
@@ -369,7 +367,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
         ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
         *out++ = enc_BL((int)(target_word - bl_word));
     }
-    for (int r = 0; r < bb->out; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_STR_Q(r, X0, 16*r);
     }
     for (int k = saves; k --> 0;) {
@@ -406,8 +404,6 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
             case CALL: {
                 struct rbb const *callee = ip->call;
                 int const cregs = callee->regs;
-                int const cin   = callee->in;
-                int const cout  = callee->out;
                 int const d     = ip->d;
                 int const save_count = d < cregs ? d : cregs;
 
@@ -417,7 +413,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
                         *out++ = enc_STR_Q(r, SP, 16*r);
                     }
                 }
-                for (int j = 0; j < cin && d > 0; j++) {
+                for (int j = 0; j < cregs && d > 0; j++) {
                     *out++ = enc_three_reg(enc_op_h[OR], j, d+j, d+j);
                 }
                 {
@@ -431,7 +427,7 @@ static size_t emit_jit_h8(struct rbb const *bb, void *buf, _Bool const kernel_is
                     *out++ = enc_ADD_imm(X16, X16, imm12);
                     *out++ = enc_BLR    (X16);
                 }
-                for (int j = cout; j --> 0 && d > 0;) {
+                for (int j = cregs; j --> 0 && d > 0;) {
                     *out++ = enc_three_reg(enc_op_h[OR], d+j, j, j);
                 }
                 if (save_count > 0) {
@@ -459,13 +455,13 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
     uint32_t *out = buf_words;
 
     int const saves = callee_saves_1q(bb->regs);
-    size_t const trampoline_size = 4 * (size_t)(2*saves + 2*bb->in + 2*bb->out + 5);
+    size_t const trampoline_size = 4 * (size_t)(2*saves + 2*bb->regs + 2*bb->regs + 5);
 
     *out++ = ENC_PUSH_FP_LR;
     for (int k = 0; k < saves; k++) {
         *out++ = enc_STP_D_pre(2*k+8, 2*k+9, SP, -16);
     }
-    for (int r = 0; r < bb->in; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_LDR_Q(r, X0, 32*r);
     }
     {
@@ -473,10 +469,10 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
         ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
         *out++ = enc_BL((int)(target_word - bl_word));
     }
-    for (int r = 0; r < bb->out; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_STR_Q(r, X0, 32*r);
     }
-    for (int r = 0; r < bb->in; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_LDR_Q(r, X0, 32*r + 16);
     }
     {
@@ -484,7 +480,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
         ptrdiff_t const target_word = (ptrdiff_t)trampoline_size / 4;
         *out++ = enc_BL((int)(target_word - bl_word));
     }
-    for (int r = 0; r < bb->out; r++) {
+    for (int r = 0; r < bb->regs; r++) {
         *out++ = enc_STR_Q(r, X0, 32*r + 16);
     }
     for (int k = saves; k --> 0;) {
@@ -522,8 +518,6 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
             case CALL: {
                 struct rbb const *callee = ip->call;
                 int const cregs = callee->regs;
-                int const cin   = callee->in;
-                int const cout  = callee->out;
                 int const d     = ip->d;
                 int const save_count = d < cregs ? d : cregs;
 
@@ -533,7 +527,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
                         *out++ = enc_STR_Q(r, SP, 16*r);
                     }
                 }
-                for (int j = 0; j < cin && d > 0; j++) {
+                for (int j = 0; j < cregs && d > 0; j++) {
                     *out++ = enc_three_reg(enc_op_f[OR], j, d+j, d+j);
                 }
                 {
@@ -547,7 +541,7 @@ static size_t emit_jit_f4(struct rbb const *bb, void *buf, _Bool const kernel_is
                     *out++ = enc_ADD_imm(X16, X16, imm12);
                     *out++ = enc_BLR    (X16);
                 }
-                for (int j = cout; j --> 0 && d > 0;) {
+                for (int j = cregs; j --> 0 && d > 0;) {
                     *out++ = enc_three_reg(enc_op_f[OR], d+j, j, j);
                 }
                 if (save_count > 0) {
@@ -590,50 +584,16 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     int const regs = max+1;
     rbb->regs = regs;
 
-    struct {
-        _Bool input, written, output;
-    } *meta = calloc((size_t)regs, sizeof *meta);
-
     _Bool kernel_is_leaf = 1;
     for (int i = 0; i < rbb->insts; i++) {
-        struct rbb_inst const *ip = rbb->inst + i;
-        if (ip->op == CALL) {
+        if (rbb->inst[i].op == CALL) {
             kernel_is_leaf = 0;
-            for (int in = 0; in < ip->call->in; in++) {
-                int const r = ip->d + in;
-                if (!meta[r].written) {
-                    meta[r].input = 1;
-                }
-                meta[r].output = 0;
-            }
-            for (int out = 0; out < ip->call->out; out++) {
-                int const r = ip->d + out;
-                meta[r].written = 1;
-                meta[r].output  = 1;
-            }
-        } else {
-            for (uint8_t const *arg = &ip->x, *end = arg+arity(ip->op); arg != end; arg++) {
-                if (!meta[*arg].written) {
-                    meta[*arg].input = 1;
-                }
-                meta[*arg].output = 0;
-            }
-            int d = ip->d;
-            meta[d].written = 1;
-            meta[d].output  = 1;
         }
     }
 
-    for (int r = 0; r < regs; r++) {
-        if (meta[r].input)  { rbb->in++; }
-        if (meta[r].output) { rbb->out++; }
-    }
-
-    free(meta);
-
     if (rbb->regs <= 16) {
         int const save_pairs = callee_saves_f8(rbb->regs);
-        size_t const trampoline = 4 * (size_t)(2*save_pairs + rbb->in + rbb->out + 4);
+        size_t const trampoline = 4 * (size_t)(2*save_pairs + 2*rbb->regs + 4);
         size_t       body       = 0;
         size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
@@ -665,7 +625,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     if (rbb->regs <= 32) {
         int const saves = callee_saves_1q(rbb->regs);
-        size_t const trampoline = 4 * (size_t)(2*saves + 2*rbb->in + 2*rbb->out + 5);
+        size_t const trampoline = 4 * (size_t)(2*saves + 2*rbb->regs + 2*rbb->regs + 5);
         size_t       body       = 0;
         size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
@@ -697,7 +657,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
 
     if (rbb->regs <= 32) {
         int const saves = callee_saves_1q(rbb->regs);
-        size_t const trampoline = 4 * (size_t)(2*saves + rbb->in + rbb->out + 4);
+        size_t const trampoline = 4 * (size_t)(2*saves + 2*rbb->regs + 4);
         size_t       body       = 0;
         size_t const x30_frame  = kernel_is_leaf ? 0 : 8;
         for (int i = 0; i < rbb->insts; i++) {
@@ -737,14 +697,8 @@ void rbb_free(struct rbb *bb) {
     free(bb);
 }
 
-struct rbb_meta rbb_meta(struct rbb const *bb) {
-    return (struct rbb_meta){
-        .inputs    = bb->in,
-        .outputs   = bb->out,
-        .registers = bb->regs,
-        .jit_f     = bb->jit_trampoline_f8 != NULL || bb->jit_trampoline_f4 != NULL,
-        .jit_h     = bb->jit_trampoline_h8 != NULL,
-    };
+int rbb_regs(struct rbb const *bb) {
+    return bb->regs;
 }
 
 void rbb_eval_f(struct rbb const *rbb, v8f reg[]) {

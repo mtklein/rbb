@@ -251,70 +251,51 @@ static void test_CALL_then_op(void) {
     rbb_free(doubler);
 }
 
-static void check_meta(struct rbb const *bb, int inputs, int outputs, int registers) {
-    struct rbb_meta const m = rbb_meta(bb);
-    m.inputs    == inputs    here;
-    m.outputs   == outputs   here;
-    m.registers == registers here;
-}
-
-static void test_meta_empty(void) {
+static void test_regs_empty(void) {
     struct rbb *bb = rbb(NULL, 0);
-    check_meta(bb, 0,0,0);
+    rbb_regs(bb) == 0 here;
     rbb_free(bb);
 }
 
-static void test_meta_no_inputs(void) {
+static void test_regs_IMM(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=0, .imm=42}, 1);
-    check_meta(bb, 0,1,1);
+    rbb_regs(bb) == 1 here;
     rbb_free(bb);
 }
 
-static void test_meta_repeated_source(void) {
+static void test_regs_repeated_source(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=0}, 1);
-    check_meta(bb, 1,1,1);
+    rbb_regs(bb) == 1 here;
     rbb_free(bb);
 }
 
-static void test_meta_in_place(void) {
+static void test_regs_in_place(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=NEG, .d=0, .x=0}, 1);
-    check_meta(bb, 1,1,1);
+    rbb_regs(bb) == 1 here;
     rbb_free(bb);
 }
 
-static void test_meta_read_after_write(void) {
+static void test_regs_gap(void) {
     struct rbb_inst const inst[] = {
         {.op=IMM, .d=2, .imm=1},
         {.op=NEG, .d=0, .x=2},
     };
     struct rbb *bb = rbb(inst, 2);
-    check_meta(bb, 0,1,3);
+    rbb_regs(bb) == 3 here;
     rbb_free(bb);
 }
 
-static void test_meta_write_read_rewrite(void) {
-    struct rbb_inst const inst[] = {
-        {.op=IMM, .d=0, .imm=5},
-        {.op=NEG, .d=1, .x=0},
-        {.op=IMM, .d=0, .imm=10},
-    };
-    struct rbb *bb = rbb(inst, 3);
-    check_meta(bb, 0,2,2);
-    rbb_free(bb);
-}
-
-static void test_meta_CALL(void) {
+static void test_regs_CALL(void) {
     struct rbb *callee = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
     struct rbb *caller = rbb(&(struct rbb_inst){.op=CALL, .d=0, .call=callee}, 1);
-    check_meta(caller, 2,1,2);
+    rbb_regs(caller) == 2 here;
     rbb_free(caller);
     rbb_free(callee);
 }
 
-static void test_jit_f_supported(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
-    meta.jit_f here;
+static void test_regs_opaque(void) {
+    struct rbb *bb = rbb(&(struct rbb_inst){.op=IMM, .d=3, .imm=1.0f}, 1);
+    rbb_regs(bb) == 4 here;
     rbb_free(bb);
 }
 
@@ -541,20 +522,6 @@ static void test_CALL_then_op_h(void) {
     rbb_free(doubler);
 }
 
-static void test_jit_h_supported(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=0, .x=0, .y=1}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
-    meta.jit_h here;
-    rbb_free(bb);
-}
-
-static void test_jit_f_single_pump(void) {
-    struct rbb *bb = rbb(&(struct rbb_inst){.op=ADD, .d=20, .x=20, .y=20}, 1);
-    struct rbb_meta meta = rbb_meta(bb);
-    meta.jit_f here;
-    rbb_free(bb);
-}
-
 static void test_roundtrip_565_f(void) {
     uint16_t dst[8] = {0}, src[] = {
         0x0000, 0xFFFF, 0x001F, 0x07E0,
@@ -713,13 +680,13 @@ int main(void) {
     test_CALL_two_args();
     test_CALL_then_op();
 
-    test_meta_empty();
-    test_meta_no_inputs();
-    test_meta_repeated_source();
-    test_meta_in_place();
-    test_meta_read_after_write();
-    test_meta_write_read_rewrite();
-    test_meta_CALL();
+    test_regs_empty();
+    test_regs_IMM();
+    test_regs_repeated_source();
+    test_regs_in_place();
+    test_regs_gap();
+    test_regs_CALL();
+    test_regs_opaque();
 
     test_IMM_h();
     test_NEG_h();
@@ -747,10 +714,6 @@ int main(void) {
     test_CALL_h();
     test_CALL_two_args_h();
     test_CALL_then_op_h();
-
-    test_jit_f_supported();
-    test_jit_h_supported();
-    test_jit_f_single_pump();
 
     test_roundtrip_565_f();
     test_roundtrip_565_h();
