@@ -563,7 +563,7 @@ static void test_roundtrip_565_f(void) {
     struct cfg_load  ld = load_565(src);
     struct cfg_store st = store_565(dst, &ld.cfg);
     v8f reg[3];
-    st.cfg.eval_f(&st.cfg, reg);
+    cfg_eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -576,7 +576,7 @@ static void test_roundtrip_565_h(void) {
     struct cfg_load  ld = load_565(src);
     struct cfg_store st = store_565(dst, &ld.cfg);
     v8h reg[3];
-    st.cfg.eval_h(&st.cfg, reg);
+    cfg_eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -590,7 +590,7 @@ static void test_roundtrip_8888_f(void) {
     struct cfg_load  ld = load_8888(src);
     struct cfg_store st = store_8888(dst, &ld.cfg);
     v8f reg[4];
-    st.cfg.eval_f(&st.cfg, reg);
+    cfg_eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -603,7 +603,7 @@ static void test_roundtrip_8888_h(void) {
     struct cfg_load  ld = load_8888(src);
     struct cfg_store st = store_8888(dst, &ld.cfg);
     v8h reg[4];
-    st.cfg.eval_h(&st.cfg, reg);
+    cfg_eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -620,7 +620,7 @@ static void test_roundtrip_1010102_f(void) {
     struct cfg_load  ld = load_1010102(src);
     struct cfg_store st = store_1010102(dst, &ld.cfg);
     v8f reg[4];
-    st.cfg.eval_f(&st.cfg, reg);
+    cfg_eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -636,7 +636,7 @@ static void test_roundtrip_1010102_h(void) {
     struct cfg_load  ld = load_1010102(src);
     struct cfg_store st = store_1010102(dst, &ld.cfg);
     v8h reg[4];
-    st.cfg.eval_h(&st.cfg, reg);
+    cfg_eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         dst[i] == src[i] here;
     }
@@ -655,7 +655,7 @@ static void test_roundtrip_fp16_f(void) {
     struct cfg_load  ld = load_fp16(src);
     struct cfg_store st = store_fp16(dst, &ld.cfg);
     v8f reg[4];
-    st.cfg.eval_f(&st.cfg, reg);
+    cfg_eval_f(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         exact_h(dst[i][0], src[i][0]) here;
         exact_h(dst[i][1], src[i][1]) here;
@@ -676,7 +676,7 @@ static void test_roundtrip_fp16_h(void) {
     struct cfg_load  ld = load_fp16(src);
     struct cfg_store st = store_fp16(dst, &ld.cfg);
     v8h reg[4];
-    st.cfg.eval_h(&st.cfg, reg);
+    cfg_eval_h(&st.cfg, reg);
     for (int i = 0; i < 8; i++) {
         exact_h(dst[i][0], src[i][0]) here;
         exact_h(dst[i][1], src[i][1]) here;

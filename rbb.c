@@ -853,6 +853,9 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
     }
 }
 
+void cfg_eval_f(struct cfg const *cfg, v8f reg[]) { cfg->eval_f(cfg, reg); }
+void cfg_eval_h(struct cfg const *cfg, v8h reg[]) { cfg->eval_h(cfg, reg); }
+
 static void cfg_rbb_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct cfg_rbb const *node = (struct cfg_rbb const*)cfg;
     node->input->eval_f(node->input, reg);

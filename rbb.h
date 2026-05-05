@@ -38,6 +38,8 @@ struct cfg {
     void (*eval_f)(struct cfg const*, v8f reg[]);
     void (*eval_h)(struct cfg const*, v8h reg[]);
 };
+void cfg_eval_f(struct cfg const*, v8f reg[]);
+void cfg_eval_h(struct cfg const*, v8h reg[]);
 
 struct cfg_load {
     struct cfg  cfg;
