@@ -57,3 +57,10 @@ struct cfg_store store_565    (uint16_t*, struct cfg const *rgb);
 struct cfg_store store_8888   (uint32_t*, struct cfg const *rgba);
 struct cfg_store store_1010102(uint32_t*, struct cfg const *rgba);
 struct cfg_store store_fp16   (     v4h*, struct cfg const *rgba);
+
+struct cfg_rbb {
+    struct cfg        cfg;
+    struct rbb const *rbb;
+    struct cfg const *input;
+};
+struct cfg_rbb cfg_rbb(struct rbb const*, struct cfg const *input);

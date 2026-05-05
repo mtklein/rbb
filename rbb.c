@@ -853,6 +853,24 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[]) {
     }
 }
 
+static void cfg_rbb_eval_f(struct cfg const *cfg, v8f reg[]) {
+    struct cfg_rbb const *node = (struct cfg_rbb const*)cfg;
+    node->input->eval_f(node->input, reg);
+    rbb_eval_f(node->rbb, reg);
+}
+static void cfg_rbb_eval_h(struct cfg const *cfg, v8h reg[]) {
+    struct cfg_rbb const *node = (struct cfg_rbb const*)cfg;
+    node->input->eval_h(node->input, reg);
+    rbb_eval_h(node->rbb, reg);
+}
+struct cfg_rbb cfg_rbb(struct rbb const *rbb, struct cfg const *input) {
+    return (struct cfg_rbb) {
+        .cfg   = { .eval_f = cfg_rbb_eval_f, .eval_h = cfg_rbb_eval_h },
+        .rbb   = rbb,
+        .input = input,
+    };
+}
+
 static void load_565_eval_f(struct cfg const *cfg, v8f reg[]) {
     struct cfg_load const *node = (struct cfg_load const*)cfg;
     v8s px;
