@@ -22,22 +22,21 @@ struct rbb_inst {
     struct rbb const *call;
 };
 
-struct cfg_meta {
+struct rbb_meta {
     int inputs, outputs, registers;
     _Bool jit_f, jit_h, pad[2];
 };
 
 struct rbb*     rbb(struct rbb_inst const inst[], int insts);
-struct cfg_meta rbb_meta(struct rbb const*);
+struct rbb_meta rbb_meta(struct rbb const*);
 void            rbb_eval_f(struct rbb const*, v8f reg[]);
 void            rbb_eval_h(struct rbb const*, v8h reg[]);
 void            rbb_free(struct rbb*);
 
 struct cfg {
-    void            (*free  )(struct cfg*);
-    void            (*eval_f)(struct cfg const*, v8f reg[]);
-    void            (*eval_h)(struct cfg const*, v8h reg[]);
-    struct cfg_meta (*meta  )(struct cfg const*);
+    void (*free)(struct cfg*);
+    void (*eval_f)(struct cfg const*, v8f reg[]);
+    void (*eval_h)(struct cfg const*, v8h reg[]);
 };
 void cfg_free(struct cfg*);
 
