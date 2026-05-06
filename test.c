@@ -220,7 +220,7 @@ static void test_LOAD_op_STORE(void) {
         {.op=LOAD,  .d=0, .x=0},
         {.op=IMM,   .d=1, .imm=1.0f},
         {.op=ADD,   .d=0, .x=0, .y=1},
-        {.op=STORE, .d=0, .x=1},  // TODO: more natural as *ptr[d] = reg[x]
+        {.op=STORE, .d=1, .x=0},
     };
     struct rbb *bb = rbb(inst, count(inst));
     {
@@ -246,7 +246,7 @@ static void test_LOAD_op_STORE(void) {
 static void test_LOAD_STORE_f4(void) {
     struct rbb_inst const inst[] = {
         {.op=LOAD,  .d=16, .x=0},
-        {.op=STORE, .d=16, .x=1},
+        {.op=STORE, .d=1,  .x=16},
     };
     struct rbb *bb = rbb(inst, count(inst));
     rbb_regs(bb) == 17 here;
@@ -306,8 +306,8 @@ static void test_ptrs_LOAD(void) {
 
 static void test_ptrs_STORE(void) {
     struct rbb *bb = rbb(&(struct rbb_inst){.op=STORE, .d=4, .x=1}, 1);
-    rbb_regs(bb) == 5 here;
-    rbb_ptrs(bb) == 2 here;
+    rbb_regs(bb) == 2 here;
+    rbb_ptrs(bb) == 5 here;
     rbb_free(bb);
 }
 

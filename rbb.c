@@ -13,9 +13,9 @@ struct rbb {
 };
 
 static int arity(enum rbb_op op) {
-    return op < NEG ? 0 :
-           op < ADD ? 1 :
-           op < FMA ? 2 : 3;
+    return op < STORE ? 0 :
+           op < ADD   ? 1 :
+           op < FMA   ? 2 : 3;
 }
 
 enum { X0=0, X1=1, X9=9, X16=16, SP=31 };
@@ -229,8 +229,8 @@ static uint32_t* emit_body_f8(struct rbb const *bb, uint32_t *out) {
                 *out++ = enc_LDP_Q(2*ip->d, 2*ip->d+1, X16, 0);
                 break;
             case STORE:
-                *out++ = enc_LDR_X(X16, X1, 8*ip->x);
-                *out++ = enc_STP_Q(2*ip->d, 2*ip->d+1, X16, 0);
+                *out++ = enc_LDR_X(X16, X1, 8*ip->d);
+                *out++ = enc_STP_Q(2*ip->x, 2*ip->x+1, X16, 0);
                 break;
         }
     }
@@ -265,8 +265,8 @@ static uint32_t* emit_body_f4(struct rbb const *bb, uint32_t *out) {
                 *out++ = enc_LDR_Q_reg(ip->d, X16, X9);
                 break;
             case STORE:
-                *out++ = enc_LDR_X    (X16, X1, 8*ip->x);
-                *out++ = enc_STR_Q_reg(ip->d, X16, X9);
+                *out++ = enc_LDR_X    (X16, X1, 8*ip->d);
+                *out++ = enc_STR_Q_reg(ip->x, X16, X9);
                 break;
         }
     }
@@ -300,8 +300,8 @@ static uint32_t* emit_body_h8(struct rbb const *bb, uint32_t *out) {
                 *out++ = enc_LDR_Q(ip->d, X16, 0);
                 break;
             case STORE:
-                *out++ = enc_LDR_X(X16, X1, 8*ip->x);
-                *out++ = enc_STR_Q(ip->d, X16, 0);
+                *out++ = enc_LDR_X(X16, X1, 8*ip->d);
+                *out++ = enc_STR_Q(ip->x, X16, 0);
                 break;
         }
     }
@@ -388,15 +388,16 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     int max_reg = -1,
         max_ptr = -1;
     while (insts --> 0) {
-        max_reg = inst->d > max_reg ? inst->d : max_reg;
-        if (inst->op == LOAD || inst->op == STORE) {
-            max_ptr = inst->x > max_ptr ? inst->x : max_ptr;
-        } else switch (arity(inst->op)) {
+        if (inst->op == STORE) { max_ptr = inst->d > max_ptr ? inst->d : max_ptr; }
+        else                   { max_reg = inst->d > max_reg ? inst->d : max_reg; }
+
+        if (inst->op == LOAD)  { max_ptr = inst->x > max_ptr ? inst->x : max_ptr; }
+        else switch (arity(inst->op)) {
             case 3: max_reg = inst->d > max_reg ? inst->d : max_reg; __attribute__((fallthrough));
             case 2: max_reg = inst->y > max_reg ? inst->y : max_reg; __attribute__((fallthrough));
             case 1: max_reg = inst->x > max_reg ? inst->x : max_reg;
-            // TODO: store is arity 1
         }
+
         rbb->inst[rbb->insts++] = *inst++;
     }
     rbb->regs = max_reg + 1;
@@ -495,7 +496,7 @@ void rbb_eval_f(struct rbb const *rbb, v8f reg[], void *ptr[]) {
         switch (ip->op) {
             case IMM:   d = ip->imm; break;
             case LOAD:  __builtin_memcpy(&d, ptr[ip->x], sizeof d); break;
-            case STORE: __builtin_memcpy(ptr[ip->x], &reg[ip->d], sizeof reg[0]); continue;
+            case STORE: __builtin_memcpy(ptr[ip->d], reg + ip->x, sizeof *reg); continue;
 
             case NEG:   d = -reg[ip->x]; break;
             case ABS:   d = __builtin_elementwise_abs  (reg[ip->x]); break;
@@ -545,7 +546,7 @@ void rbb_eval_h(struct rbb const *rbb, v8h reg[], void *ptr[]) {
         switch (ip->op) {
             case IMM:   d = (_Float16)ip->imm; break;
             case LOAD:  __builtin_memcpy(&d, ptr[ip->x], sizeof d); break;
-            case STORE: __builtin_memcpy(ptr[ip->x], &reg[ip->d], sizeof reg[0]); continue;
+            case STORE: __builtin_memcpy(ptr[ip->d], reg + ip->x, sizeof *reg); continue;
 
             case NEG:   d = -reg[ip->x]; break;
             case ABS:   d = __builtin_elementwise_abs  (reg[ip->x]); break;

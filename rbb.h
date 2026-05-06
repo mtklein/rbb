@@ -8,8 +8,8 @@ typedef short    v8s __attribute__((ext_vector_type(8)));
 typedef int      v8i __attribute__((ext_vector_type(8)));
 
 enum rbb_op {
-    IMM, LOAD, STORE,
-    NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND, NOT,
+    IMM, LOAD,
+    STORE, NEG, ABS, SQRT, FLOOR, CEIL, TRUNC, ROUND, NOT,
     ADD, SUB, MUL, DIV, MIN, MAX, EQ, GT, GE, AND, OR, XOR,
     FMA, SEL,
 };
