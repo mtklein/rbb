@@ -6,7 +6,7 @@
 
 static const _Float16 T = ((v8h)(v8s)-1).x;
 
-static _Bool exact(_Float16 x, _Float16 y) {
+static bool exact(_Float16 x, _Float16 y) {
     union { _Float16 h; short bits; } X={x}, Y={y};
     return X.bits == Y.bits;
 }
@@ -150,7 +150,7 @@ static void test_SEL(void) {
 }
 
 static void test_regs_empty(void) {
-    struct rbb *bb = rbb(NULL, 0);
+    struct rbb *bb = rbb(nullptr, 0);
     rbb_regs(bb) == 0 here;
     rbb_free(bb);
 }

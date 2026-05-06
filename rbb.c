@@ -161,11 +161,8 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
     int max_reg = -1;
     while (insts --> 0) {
         max_reg = inst->d > max_reg ? inst->d : max_reg;
-        switch (arity(inst->op)) {
-            case 3: max_reg = inst->d > max_reg ? inst->d : max_reg; __attribute__((fallthrough));
-            case 2: max_reg = inst->y > max_reg ? inst->y : max_reg; __attribute__((fallthrough));
-            case 1: max_reg = inst->x > max_reg ? inst->x : max_reg;
-        }
+        if (arity(inst->op) >= 1) { max_reg = max_reg < inst->x ? inst->x : max_reg; }
+        if (arity(inst->op) >= 2) { max_reg = max_reg < inst->y ? inst->y : max_reg; }
         rbb->inst[rbb->insts++] = *inst++;
     }
     rbb->regs = max_reg + 1;
@@ -177,7 +174,7 @@ struct rbb* rbb(struct rbb_inst const inst[], int insts) {
         }
     }
     if (rbb->jit_size > 0) {
-        void *buf = mmap(NULL, rbb->jit_size,
+        void *buf = mmap(nullptr, rbb->jit_size,
                          PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
         if (buf != MAP_FAILED) {
             emit_jit(rbb, buf);
