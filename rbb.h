@@ -3,9 +3,7 @@
 #include <stdint.h>
 
 typedef _Float16 v8h __attribute__((ext_vector_type(8)));
-typedef float    v8f __attribute__((ext_vector_type(8)));
 typedef short    v8s __attribute__((ext_vector_type(8)));
-typedef int      v8i __attribute__((ext_vector_type(8)));
 
 enum rbb_op {
     IMM,
@@ -20,8 +18,7 @@ struct rbb_inst {
     float       imm;
 };
 
-struct rbb* rbb(struct rbb_inst const inst[], int insts);
-int    rbb_regs  (struct rbb const*);
-void   rbb_eval_f(struct rbb const*, v8f reg[]);
-void   rbb_eval_h(struct rbb const*, v8h reg[]);
-void   rbb_free  (struct rbb*);
+struct rbb* rbb     (struct rbb_inst const inst[], int insts);
+int         rbb_regs(struct rbb const*);
+void        rbb_eval(struct rbb const*, v8h reg[]);
+void        rbb_free(struct rbb*);
