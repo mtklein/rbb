@@ -125,7 +125,7 @@ static uint32_t* emit_body(struct rbb const *bb, uint32_t *out) {
                 break;
 
             case IMM: {
-                union { _Float16 h; uint16_t u; } v = { (_Float16)ip->imm };
+                union { _Float16 h; uint16_t u; } v = { ip->imm };
                 *out++ = enc_MOVZ_W(X16, v.u, 0);
                 *out++ = enc_two_reg(0x4E020C00, ip->d, X16);  // DUP Vd.8H, W16
             } break;
@@ -212,7 +212,7 @@ void rbb_eval(struct rbb const *rbb, v8h reg[]) {
         struct rbb_inst const *ip = rbb->inst + i;
         v8h d = {0};
         switch (ip->op) {
-            case IMM:   d = (_Float16)ip->imm; break;
+            case IMM:   d = ip->imm; break;
 
             case NEG:   d = -reg[ip->x]; break;
             case ABS:   d = __builtin_elementwise_abs  (reg[ip->x]); break;

@@ -1,16 +1,17 @@
 builddir = out
 
-opt = clang -O1
 dbg = clang -fsanitize=address,integer,undefined -fno-sanitize-recover=all
+opt = clang -O1
 
 warn = -Weverything $
        -Wno-declaration-after-statement $
        -Wno-implicit-void-ptr-cast $
        -Wno-poison-system-directories $
+       -Wno-pre-c23-compat $
        -Wno-switch-default
 
 rule compile
-    command = ccache $cc -g -fcolor-diagnostics -Werror $warn -MD -MF $out.d -c $in -o $out
+    command = ccache $cc -std=c23 -g -fcolor-diagnostics -Werror $warn -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
